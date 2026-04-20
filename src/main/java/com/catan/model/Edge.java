@@ -17,6 +17,18 @@ public class Edge {
         }
     }
 
+    // mt mais limpo assim
+    public boolean hasConnectingRoadFor(Player player) {
+        return v1.hasConnectingRoadFor(player) ||  v2.hasConnectingRoadFor(player);
+    }
+
+    // mt mais limpo AINDA assim
+    public boolean hasConnectingSettlementOrCityFor(Player player) {
+        boolean v1HasBuilding = !v1.isEmpty() && v1.getBuilding().getOwner().equals(player);
+        boolean v2HasBuilding = !v2.isEmpty() && v2.getBuilding().getOwner().equals(player);
+        return v1HasBuilding || v2HasBuilding;
+    }
+
     public Vertex getV1() { return v1; }
     public Vertex getV2() { return v2; }
     public EdgeBuilding getBuilding() { return building; }
@@ -28,3 +40,4 @@ public class Edge {
         return id;
     }
 }
+

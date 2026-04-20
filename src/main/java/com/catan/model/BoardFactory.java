@@ -19,6 +19,7 @@ public class BoardFactory {
                 ResourceType.DESERT
         ));
         Collections.shuffle(resources);
+
         List<Integer> tokens = new ArrayList<>(Arrays.asList(
                 2, 3, 3, 4, 4, 5, 5, 6, 6, 8, 8, 9, 9, 10, 10, 11, 11, 12
         ));
@@ -29,12 +30,14 @@ public class BoardFactory {
         }
 
         int[] hexesPerRow = {3, 4, 5, 4, 3};
-        double hexSize = 50.0;
+
+        double hexSize = 400.0;
         double width = Math.sqrt(3) * hexSize;
         double height = 2 * hexSize;
         double verticalDist = height * 0.75;
-        double centerX = 400;
-        double startY = 150;
+
+        double centerX = 2000;
+        double startY = 800;
 
         int tileId = 0;
 
@@ -52,7 +55,72 @@ public class BoardFactory {
                 board.createTile(tileId++, res, token, x, y, hexSize);
             }
         }
+
+        // Distribui os portos antes de finalizar a criação do tabuleiro!
+        assignRandomPorts(board);
+
         return board;
+    }
+
+    private static void assignRandomPorts(Board board) {
+        // 1. Cria a lista estrita dos 9 portos padrão (4 Genéricos + 5 Específicos)
+        List<Port> portsToAssign = new ArrayList<>(Arrays.asList(
+                new Port(null, 3), new Port(null, 3), new Port(null, 3), new Port(null, 3),
+                new Port(ResourceType.WOOD, 2),
+                new Port(ResourceType.BRICK, 2),
+                new Port(ResourceType.WOOL, 2),
+                new Port(ResourceType.WHEAT, 2),
+                new Port(ResourceType.ORE, 2)
+        ));
+        Collections.shuffle(portsToAssign);
+
+        // 2. Pega todas as arestas que ficam na Costa
+        List<Edge> coastalEdges = new ArrayList<>();
+        for (Edge e : board.getEdges()) {
+            if (e.getV1().getAdjacentTiles().size() <= 2 && e.getV2().getAdjacentTiles().size() <= 2) {
+                coastalEdges.add(e);
+            }
+        }
+        Collections.shuffle(coastalEdges);
+
+        // 3. Distribui exatamente os 9 portos com regras de espaçamento
+        int portsPlaced = 0;
+        for (Edge edge : coastalEdges) {
+            if (portsPlaced >= 9) break; // Garante que só vai colocar 9!
+
+            if (!edge.getV1().hasPort() && !edge.getV2().hasPort()) {
+
+                boolean neighborHasPort = false;
+                for (Vertex neighbor : edge.getV1().getAdjacentVertices()) {
+                    if (neighbor.hasPort()) neighborHasPort = true;
+                }
+                for (Vertex neighbor : edge.getV2().getAdjacentVertices()) {
+                    if (neighbor.hasPort()) neighborHasPort = true;
+                }
+
+                if (!neighborHasPort) {
+                    Port port = portsToAssign.get(portsPlaced);
+                    edge.getV1().setPort(port);
+                    edge.getV2().setPort(port);
+                    portsPlaced++;
+                }
+            }
+        }
+
+        // 4. Fallback de Segurança:
+        // Se as regras de espaçamento ali em cima forem muito duras e não derem conta de posicionar todos os 9,
+        // esse bloco de emergência garante que o resto da lista seja colocado no mar em arestas vazias.
+        if (portsPlaced < 9) {
+            for (Edge edge : coastalEdges) {
+                if (portsPlaced >= 9) break;
+                if (!edge.getV1().hasPort() && !edge.getV2().hasPort()) {
+                    Port port = portsToAssign.get(portsPlaced);
+                    edge.getV1().setPort(port);
+                    edge.getV2().setPort(port);
+                    portsPlaced++;
+                }
+            }
+        }
     }
 
     private static boolean checkProbabilityBalance(List<ResourceType> resources, List<Integer> tokens) {

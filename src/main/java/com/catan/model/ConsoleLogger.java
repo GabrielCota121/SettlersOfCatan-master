@@ -1,9 +1,9 @@
 package com.catan.model;
 
-public class ConsoleLogger implements GameLogger {
+public class ConsoleLogger implements IGameLogger {
     @Override
     public void log(String message) {
-        System.out.println("[INFO] " + message);
+        System.out.println(message);
     }
 
     @Override

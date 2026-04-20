@@ -1,6 +1,6 @@
 package com.catan.model;
 
-public interface GameLogger {
+public interface IGameLogger {
     void log(String message);
     void error(String message);
 }

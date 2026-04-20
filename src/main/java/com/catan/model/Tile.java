@@ -16,14 +16,14 @@ public class Tile {
 
     public void setVertices(Vertex[] vertices) {
         if (vertices.length != 6) {
-            throw new IllegalArgumentException("Um hexágono deve ter 6 vértices, seu animal");
+            throw new IllegalArgumentException("Um hexágono deve ter 6 vértices, né");
         }
         this.vertices = vertices;
     }
 
     public void setEdges(Edge[] edges) {
         if (edges.length != 6) {
-            throw new IllegalArgumentException("Um hexágono deve ter 6 arestas, seu animal");
+            throw new IllegalArgumentException("Um hexágono deve ter 6 arestas, né");
         }
         this.edges = edges;
     }

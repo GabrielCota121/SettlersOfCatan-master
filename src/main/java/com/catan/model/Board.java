@@ -21,7 +21,6 @@ public class Board {
         Vertex[] hexVertices = new Vertex[6];
         Edge[] hexEdges = new Edge[6];
 
-
         for (int i = 0; i < 6; i++) {
             double angle_deg = 60 * i + 30;
             double angle_rad = Math.PI / 180 * angle_deg;
@@ -35,6 +34,7 @@ public class Board {
                 vertexRegistry.put(vId, tempVertex);
             }
             hexVertices[i] = vertexRegistry.get(vId);
+            hexVertices[i].addAdjacentTile(tile);
         }
 
         for (int i = 0; i < 6; i++) {

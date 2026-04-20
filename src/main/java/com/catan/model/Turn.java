@@ -2,11 +2,12 @@ package com.catan.model;
 
 public class Turn {
     private Player currentPlayer;
-    // TODO implementar TurnState e as classes que implementam
-    private TurnState currentState;
+    private ITurnState currentState;
+    private final CatanGameManager gameManager;
 
-    public Turn(Player startingPlayer) {
-        this.currentPlayer = startingPlayer;
+    public Turn(Player player, CatanGameManager gameManager) {
+        this.currentPlayer = player;
+        this.gameManager = gameManager;
     }
 
     public Player getCurrentPlayer() {
@@ -17,10 +18,11 @@ public class Turn {
         this.currentPlayer = currentPlayer;
     }
 
-    public TurnState getState() {return currentState;}
+    public ITurnState getState() {return currentState;}
 
-    // Futuramente quero que fique mais ou menos assin:
+    public void setState(ITurnState state) {
+        this.currentState = state;
+    }
 
-    // public void changeState(TurnState newState) {..}
-    // public void handleAction(..) {..}
+    public CatanGameManager getGameManager() { return gameManager; }
 }
