@@ -1,6 +1,20 @@
 package com.catan;
 
-import com.catan.model.*;
+import com.catan.model.board.*;
+import com.catan.model.building.Settlement;
+import com.catan.model.game.CatanGameManager;
+import com.catan.model.game.ResourceType;
+import com.catan.model.game.Turn;
+import com.catan.model.game.Bank;
+import com.catan.model.logging.ConsoleLogger;
+import com.catan.model.logging.IGameLogger;
+import com.catan.model.player.Player;
+import com.catan.model.state.ITurnState;
+import com.catan.model.state.MoveRobberState;
+import com.catan.model.state.SetupState;
+import com.catan.model.state.WaitingDiscardState;
+import com.catan.model.view.PieceDrawer;
+import com.catan.model.view.PlayerHandView;
 import javafx.application.Application;
 import javafx.scene.Scene;
 import javafx.scene.canvas.Canvas;
@@ -129,6 +143,36 @@ public class Main extends Application {
             });
         }
 
+        PlayerHandView bankHandView = new PlayerHandView();
+
+        VBox bankInfoBox = new VBox(5);
+        bankInfoBox.setAlignment(javafx.geometry.Pos.CENTER);
+
+        Label bankNameLabel = new Label("BANCO");
+        bankNameLabel.setStyle("-fx-font-size: 20px; -fx-font-weight: bold; -fx-text-fill: #ecf0f1;");
+
+        ImageView bankIconView = new ImageView();
+        bankIconView.setFitHeight(45);
+        bankIconView.setPreserveRatio(true);
+
+        try {
+            Image bankIcon = new Image(getClass().getResourceAsStream("/assets/bank/bankicon.png"));
+            bankIconView.setImage(bankIcon);
+        } catch (Exception e) {
+            System.out.println("CadÊ o ícone do Bank??");
+        }
+
+        bankInfoBox.getChildren().addAll(bankNameLabel, bankIconView);
+
+        gameManager.getBank().getWallet().setOnWalletChangedListener(() -> {
+            bankHandView.update(gameManager.getBank().getWallet());
+        });
+
+        bankHandView.update(gameManager.getBank().getWallet());
+
+        javafx.scene.layout.Region spacer = new javafx.scene.layout.Region();
+        HBox.setHgrow(spacer, javafx.scene.layout.Priority.ALWAYS);
+
         VBox playerInfoBox = new VBox(5);
         playerInfoBox.setAlignment(javafx.geometry.Pos.CENTER);
 
@@ -252,6 +296,7 @@ public class Main extends Application {
                 if (clickedTile != null) {
                     MoveRobberState robberState = (MoveRobberState) currentState;
                     List<Player> victims = robberState.moveRobber(clickedTile, gameManager.getCurrentTurn());
+                    victims.removeIf(p -> p.getWallet().getTotalCards() == 0);
 
                     if (victims.isEmpty()) {
                         robberState.executeSteal(null, gameManager.getCurrentTurn());
@@ -262,7 +307,7 @@ public class Main extends Application {
                         updateActionUI.run();
 
                     } else {
-                        buildStealVictimSidebar(victims, robberState);
+                        buildStealVictimSidebar(victims, robberState, updateActionUI); // Passando o runnable aqui
                     }
                 }
                 render(gc, board, true);
@@ -303,10 +348,19 @@ public class Main extends Application {
         bindPlayerToUI.run();
         gameManager.setOnTurnChangedListener(bindPlayerToUI);
 
-        HBox bottomMenu = new HBox(40, playerInfoBox, handView, turnControlsBox);
+        HBox bottomMenu = new HBox(20,
+                playerInfoBox,
+                handView,
+                spacer,
+                bankInfoBox,
+                bankHandView,
+                turnControlsBox
+        );
         bottomMenu.setPrefHeight(200);
-        bottomMenu.setStyle("-fx-background-color: #2c3e50; -fx-padding: 20 20 20 50;");
+        bottomMenu.setStyle("-fx-background-color: #2c3e50; -fx-padding: 15;");
         bottomMenu.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+        HBox.setHgrow(spacer, javafx.scene.layout.Priority.ALWAYS);
+
         root.setBottom(bottomMenu);
 
         rightSidebar = new VBox(15);
@@ -583,8 +637,7 @@ public class Main extends Application {
         rightSidebar.getChildren().clear();
         ITurnState state = gameManager.getCurrentTurn().getState();
 
-        if (state instanceof WaitingDiscardState) {
-            WaitingDiscardState discardState = (WaitingDiscardState) state;
+        if (state instanceof WaitingDiscardState discardState) {
             List<Player> pending = discardState.getPendingPlayers();
 
             if (!pending.isEmpty()) {
@@ -671,7 +724,7 @@ public class Main extends Application {
         rightSidebar.getChildren().addAll(titleLabel, countLabel, resourcesBox, confirmBtn);
     }
 
-    private void buildStealVictimSidebar(List<Player> victims, MoveRobberState state) {
+    private void buildStealVictimSidebar(List<Player> victims, MoveRobberState state, Runnable updateActionUI) {
         rightSidebar.getChildren().clear();
 
         Label titleLabel = new Label("Escolha sua vítima:");
@@ -684,7 +737,7 @@ public class Main extends Application {
 
             btn.setOnAction(e -> {
                 state.executeSteal(victim, gameManager.getCurrentTurn());
-                updateSidebar();
+                updateActionUI.run();
             });
             rightSidebar.getChildren().add(btn);
         }
