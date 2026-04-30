@@ -1,5 +1,6 @@
 package com.catan.model.state;
 
+import com.catan.model.cards.IDevelopmentCard;
 import com.catan.model.game.Bank;
 import com.catan.model.game.CatanGameManager;
 import com.catan.model.game.ResourceType;
@@ -71,7 +72,7 @@ public class WaitingDiscardState implements ITurnState {
             }
 
             manager.getLogger().log("Mova o ladrão!");
-            currentTurn.setState(new MoveRobberState());
+            currentTurn.setState(new MoveRobberState(new MainState()));
         }
     }
 
@@ -98,4 +99,7 @@ public class WaitingDiscardState implements ITurnState {
 
     @Override
     public boolean canRollDice() { return false; }
+
+    @Override public boolean playDevelopmentCard(IDevelopmentCard card, Turn currentTurn) {return false;}
+
 }

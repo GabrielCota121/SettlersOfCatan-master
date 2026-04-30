@@ -1,5 +1,6 @@
 package com.catan.model.state;
 
+import com.catan.model.cards.IDevelopmentCard;
 import com.catan.model.game.CatanGameManager;
 import com.catan.model.game.ResourceType;
 import com.catan.model.game.Turn;
@@ -14,6 +15,12 @@ import java.util.List;
 
 public class MoveRobberState implements ITurnState {
 
+    private final ITurnState previousState;
+
+    public MoveRobberState(ITurnState previousState) {
+        this.previousState = previousState;
+    }
+
     @Override
     public String getName() {
         return "Aguardando mover o Ladrão! BORAA!!";
@@ -24,7 +31,7 @@ public class MoveRobberState implements ITurnState {
         Robber robber = manager.getRobber();
 
         if (newTile.equals(robber.getCurrentTile())) {
-            manager.getLogger().log("O ladrão deve ser movido para um tile diferente do atual, gënio!");
+            manager.getLogger().log("O ladrão deve ser movido para um tile diferente do atual, gênio!");
             return null;
         }
 
@@ -58,9 +65,10 @@ public class MoveRobberState implements ITurnState {
         } else {
             currentTurn.getGameManager().getLogger().log("Ninguém para roubar neste terreno. Que azar!");
         }
-        currentTurn.setState(new MainState());
+        currentTurn.setState(previousState);
     }
 
+    @Override public boolean playDevelopmentCard(IDevelopmentCard card, Turn currentTurn) {return false;}
     @Override public boolean rollDice(Turn currentTurn) { return false; }
     @Override public boolean buildSettlement(Vertex vertex, Turn currentTurn) { return false; }
     @Override public boolean buildRoad(Edge edge, Turn currentTurn) { return false; }
