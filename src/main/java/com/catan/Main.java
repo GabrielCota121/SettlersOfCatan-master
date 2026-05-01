@@ -85,10 +85,10 @@ public class Main extends Application {
 
         Board board = BoardFactory.createStandardBoard();
         List<Player> players = new ArrayList<>();
-        players.add(new Player(1, "Lucas", "PURPLE"));
-        players.add(new Player(2, "Gabriel", "LIGHTBLUE"));
-        players.add(new Player(3, "Juliana", "BRONZE"));
-        players.add(new Player(4, "Cauã", "BLACK"));
+        players.add(new Player(1, "Lucas", "GREEN"));
+        players.add(new Player(2, "Gabriel", "BLUE"));
+        players.add(new Player(3, "Juliana", "YELLOW"));
+        players.add(new Player(4, "Marcelle", "RED"));
 
         IGameLogger logger = new ConsoleLogger();
         gameManager = new CatanGameManager(board, players, logger);
@@ -454,6 +454,12 @@ public class Main extends Application {
             render(gc, board, true);
         });
 
+        rightSidebar = new VBox(15);
+        rightSidebar.setPrefWidth(350);
+        rightSidebar.setStyle("-fx-background-color: #34495e; -fx-padding: 20;");
+        rightSidebar.setAlignment(javafx.geometry.Pos.TOP_CENTER);
+        root.setRight(rightSidebar);
+
         bindPlayerToUI.run();
         gameManager.setOnTurnChangedListener(bindPlayerToUI);
 
@@ -473,11 +479,7 @@ public class Main extends Application {
 
         root.setBottom(bottomMenu);
 
-        rightSidebar = new VBox(15);
-        rightSidebar.setPrefWidth(350);
-        rightSidebar.setStyle("-fx-background-color: #34495e; -fx-padding: 20;");
-        rightSidebar.setAlignment(javafx.geometry.Pos.TOP_CENTER);
-        root.setRight(rightSidebar);
+
 
         render(gc, board, true);
 
@@ -1149,6 +1151,7 @@ public class Main extends Application {
             if (p.getPlayableCards() != null) numDevCards += p.getPlayableCards().size();
             if (p.getNewCards() != null) numDevCards += p.getNewCards().size();
             int numKnights = p.getNumKnights();
+            int longestRoad = p.getLongestRoad();
 
             HBox statsBox = new HBox(12);
             statsBox.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
@@ -1183,7 +1186,17 @@ public class Main extends Application {
             knightLabel.setStyle("-fx-text-fill: #bdc3c7; -fx-font-weight: bold; -fx-font-size: 20px;");
             knightBox.getChildren().addAll(knightIcon, knightLabel);
 
-            statsBox.getChildren().addAll(resBox, devBox, knightBox);
+            HBox roadBox = new HBox(5);
+            roadBox.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+            ImageView roadIcon = new ImageView();
+            roadIcon.setFitHeight(25);
+            roadIcon.setPreserveRatio(true);
+            try { roadIcon.setImage(new Image(getClass().getResourceAsStream("/assets/bonus/longestroad.png"))); } catch(Exception e){}
+            Label roadLabel = new Label(String.valueOf(longestRoad));
+            roadLabel.setStyle("-fx-text-fill: #bdc3c7; -fx-font-weight: bold; -fx-font-size: 20px;");
+            roadBox.getChildren().addAll(roadIcon, roadLabel);
+
+            statsBox.getChildren().addAll(resBox, devBox, knightBox, roadBox);
             infoBox.getChildren().addAll(nameLabel, statsBox);
 
             playerBox.getChildren().addAll(settlementBox, infoBox);

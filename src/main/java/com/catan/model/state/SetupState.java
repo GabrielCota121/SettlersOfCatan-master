@@ -12,7 +12,6 @@ import com.catan.model.building.Road;
 import com.catan.model.building.Settlement;
 import com.catan.model.player.Player;
 
-// O Estado de Setup Inicial
 public class SetupState implements ITurnState {
     @Override
     public String getName() { return "Setup"; }
@@ -86,9 +85,14 @@ public class SetupState implements ITurnState {
         if (!connectsToOrphanV1 && !connectsToOrphanV2) {
             return false;
         }
+
         edge.setBuilding(new Road(activePlayer, edge));
         roadPlaced = true;
         activePlayer.incrementRoads();
+
+        // Só pra aparecer também a maior estrada do jogador no SetupState!
+        currentTurn.getGameManager().getRoadBonus().updateLongestRoad(activePlayer, currentTurn.getGameManager().getBoard().getEdges());
+
         currentTurn.getGameManager().proceedTurn();
         return true;
     }
@@ -119,6 +123,6 @@ public class SetupState implements ITurnState {
     @Override
     public boolean canRollDice() { return false; }
 
-    @Override public boolean playDevelopmentCard(IDevelopmentCard card, Turn currentTurn) {return false;}
-
+    @Override
+    public boolean playDevelopmentCard(IDevelopmentCard card, Turn currentTurn) {return false;}
 }

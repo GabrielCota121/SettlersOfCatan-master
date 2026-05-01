@@ -23,7 +23,7 @@ public class MoveRobberState implements ITurnState {
 
     @Override
     public String getName() {
-        return "Aguardando mover o Ladrão! BORAA!!";
+        return "Aguardando mover o Robber! BORAA!!";
     }
 
     public List<Player> moveRobber(Tile newTile, Turn currentTurn) {
@@ -31,12 +31,12 @@ public class MoveRobberState implements ITurnState {
         Robber robber = manager.getRobber();
 
         if (newTile.equals(robber.getCurrentTile())) {
-            manager.getLogger().log("O ladrão deve ser movido para um tile diferente do atual, gênio!");
+            manager.getLogger().log("O Robber deve ser movido para um tile diferente do atual, gênio!");
             return null;
         }
 
         robber.move(newTile);
-        manager.getLogger().log("Ladrão movido para o tile de " + newTile.getResource());
+        manager.getLogger().log("Robber movido para o tile de " + newTile.getResource());
 
         List<Player> victims = new ArrayList<>();
         Player currentPlayer = currentTurn.getCurrentPlayer();
@@ -63,7 +63,7 @@ public class MoveRobberState implements ITurnState {
                 );
             }
         } else {
-            currentTurn.getGameManager().getLogger().log("Ninguém para roubar neste terreno. Que azar!");
+            currentTurn.getGameManager().getLogger().log("Ninguém para roubar neste terreno. MUITO BOA JOGADA, HEIN!!!!");
         }
         currentTurn.setState(previousState);
     }

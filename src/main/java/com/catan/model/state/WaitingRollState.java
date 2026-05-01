@@ -87,7 +87,16 @@ public class WaitingRollState implements ITurnState {
                 currentTurn.markDevCardAsPlayed();
             }
             currentTurn.getCurrentPlayer().removeCard(card);
+            checkWinCondition(currentTurn);
         }
         return success;
+    }
+
+    private void checkWinCondition(Turn currentTurn) {
+        Player activePlayer = currentTurn.getCurrentPlayer();
+        if (activePlayer.getVictoryPoints() >= 10) {
+            currentTurn.getGameManager().getLogger().log("Fim do jogo! " + activePlayer.getName() + " ganhou com " + activePlayer.getVictoryPoints() + " pontos de vitória! GRATS!");
+            currentTurn.setState(new GameOverState(activePlayer));
+        }
     }
 }

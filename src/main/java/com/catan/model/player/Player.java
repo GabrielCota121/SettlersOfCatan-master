@@ -89,6 +89,8 @@ public class Player {
     }
 
     public int getId() { return id; }
+    public void setLongestRoad(int longestRoad) {this.longestRoad = longestRoad;}
+    public int getLongestRoad() {return longestRoad;}
     public String getName() { return name; }
     public String getColor() { return color; }
     public ResourceWallet getWallet() { return wallet; }

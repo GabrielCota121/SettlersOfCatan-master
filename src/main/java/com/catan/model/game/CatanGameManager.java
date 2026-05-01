@@ -4,8 +4,8 @@ import com.catan.model.cards.DevelopmentDeck;
 import com.catan.model.cards.IDevelopmentCard;
 import com.catan.model.logging.IGameLogger;
 import com.catan.model.board.*;
-import com.catan.model.building.VertexBuilding;
 import com.catan.model.player.Player;
+import com.catan.model.state.GameOverState;
 import com.catan.model.state.SetupState;
 import com.catan.model.state.WaitingRollState;
 
@@ -28,6 +28,8 @@ public class CatanGameManager {
     private Runnable onTurnChanged;
     private Robber robber;
     private final DevelopmentDeck developmentDeck;
+    private final RoadBonus roadBonus;
+    private final ArmyBonus armyBonus;
 
     public CatanGameManager(Board board, List<Player> players, IGameLogger logger) {
         this.board = board;
@@ -37,6 +39,8 @@ public class CatanGameManager {
         this.dice2 = new Dice();
         this.bank = new Bank();
         this.developmentDeck = new DevelopmentDeck();
+        this.roadBonus = new RoadBonus(this.logger);
+        this.armyBonus = new ArmyBonus(this.logger);
 
         for (Tile tile : board.getTiles()) {
             if (tile.getResource() == ResourceType.DESERT) {
@@ -90,9 +94,16 @@ public class CatanGameManager {
             nextPlayer.makeNewCardsPlayable();
 
             this.currentTurn = new Turn(nextPlayer, this);
-            this.currentTurn.setState(new WaitingRollState());
+
+            if (nextPlayer.getVictoryPoints() >= 10) {
+                logger.log(nextPlayer.getName() + " já conquistou " + nextPlayer.getVictoryPoints() + " pontos e vence o jogo!!!");
+                this.currentTurn.setState(new GameOverState(nextPlayer));
+            } else {
+                this.currentTurn.setState(new WaitingRollState());
+            }
             logger.log("Vez de " + currentTurn.getCurrentPlayer().getName());
         }
+
         if (onTurnChanged != null) {
             onTurnChanged.run();
         }
@@ -105,6 +116,8 @@ public class CatanGameManager {
     public IGameLogger getLogger() {return logger;}
     public Robber getRobber() {return robber;}
     public DevelopmentDeck getDevelopmentDeck() {return developmentDeck;}
+    public Board getBoard() {return board;}
+    public RoadBonus getRoadBonus() {return roadBonus;}
 
     public boolean rollDice(Player player) {
         if (!player.equals(currentTurn.getCurrentPlayer())) {
@@ -125,9 +138,6 @@ public class CatanGameManager {
                 if (type != ResourceType.DESERT && player.getTradeRate(type) > 3) {
                     player.setTradeRate(type, 3);
                 }
-                else {
-                    logger.log("A taxa de " + type + " de " + player.getName() + " foi mantida em " + player.getTradeRate(type) + " pra 1!");
-                }
             }
             logger.log(player.getName() + " agora possui porto 3 pra 1!");
         } else {
@@ -136,7 +146,10 @@ public class CatanGameManager {
         }
     }
 
-    public void incrementKnightsPlayed(Player player) {player.incrementKnightsPlayed();}
+    public void incrementKnightsPlayed(Player player) {
+        player.incrementKnightsPlayed();
+        this.armyBonus.updateLargestArmy(player);
+    }
 
     public IDevelopmentCard drawDevelopmentCard() {
         return developmentDeck.drawCard();

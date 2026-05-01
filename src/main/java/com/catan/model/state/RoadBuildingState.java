@@ -41,6 +41,7 @@ public class RoadBuildingState implements ITurnState {
         edge.setBuilding(new Road(player, edge));
         player.incrementRoads();
         roadsBuilt++;
+        currentTurn.getGameManager().getRoadBonus().updateLongestRoad(player, currentTurn.getGameManager().getBoard().getEdges());
 
         if (roadsBuilt >= 2 || player.getNumRoads() == 15) {
             currentTurn.getGameManager().getLogger().log("Road Building concluída!");

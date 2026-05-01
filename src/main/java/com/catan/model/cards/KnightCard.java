@@ -12,7 +12,7 @@ public class KnightCard implements IDevelopmentCard {
     @Override
     public boolean play(CatanGameManager gameManager, Player player) {
         gameManager.incrementKnightsPlayed(player);
-        gameManager.getLogger().log(player.getName() + " jogou um Cavaleiro! Mova o Ladrão.");
+        gameManager.getLogger().log(player.getName() + " jogou um Knight! Mova o Robber!");
         ITurnState previousState = gameManager.getCurrentTurn().getState();
         gameManager.getCurrentTurn().setState(new MoveRobberState(previousState));
         return true;

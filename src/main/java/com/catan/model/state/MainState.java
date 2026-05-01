@@ -37,6 +37,12 @@ public class MainState implements ITurnState {
             }
             activePlayer.incrementSettlements();
             activePlayer.incrementVictoryPoints();
+
+            // CASO haja quebra de estrada, devemos calcular novamente quem detem a maior estrada!
+            // Escolhi botar pra sempre fazer isto por corretude! (é rápido, eu juro)
+            CatanGameManager gm = currentTurn.getGameManager();
+            gm.getRoadBonus().reevaluateAllPlayers(gm.getPlayers(), gm.getBoard().getEdges());
+            checkWinCondition(currentTurn);
             return true;
         }
         return false;
@@ -64,6 +70,7 @@ public class MainState implements ITurnState {
             activePlayer.decrementSettlements();
             activePlayer.incrementCities();
             activePlayer.incrementVictoryPoints();
+            checkWinCondition(currentTurn);
             return true;
         }
         return false;
@@ -88,9 +95,11 @@ public class MainState implements ITurnState {
         }
 
         if (activePlayer.getWallet().payCost(BuildingCost.ROAD.getCost())) {
-            bank.receiveResources(BuildingCost.ROAD.getCost()); // Devolve pro banco!
+            bank.receiveResources(BuildingCost.ROAD.getCost());
             edge.setBuilding(new Road(activePlayer, edge));
             activePlayer.incrementRoads();
+            currentTurn.getGameManager().getRoadBonus().updateLongestRoad(activePlayer, currentTurn.getGameManager().getBoard().getEdges());
+            checkWinCondition(currentTurn);
             return true;
         }
         return false;
@@ -173,7 +182,16 @@ public class MainState implements ITurnState {
                 currentTurn.markDevCardAsPlayed();
             }
             currentTurn.getCurrentPlayer().removeCard(card);
+            checkWinCondition(currentTurn);
         }
         return success;
+    }
+
+    private void checkWinCondition(Turn currentTurn) {
+        Player activePlayer = currentTurn.getCurrentPlayer();
+        if (activePlayer.getVictoryPoints() >= 10) {
+            currentTurn.getGameManager().getLogger().log("Fim do jogo! " + activePlayer.getName() + " ganhou com " + activePlayer.getVictoryPoints() + " pontos de vitória! GRATS!");
+            currentTurn.setState(new GameOverState(activePlayer));
+        }
     }
 }
