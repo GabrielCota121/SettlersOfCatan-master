@@ -1,5 +1,6 @@
 package com.catan.model.state;
 
+import com.catan.model.cards.IDevelopmentCard;
 import com.catan.model.game.Turn;
 import com.catan.model.board.Edge;
 import com.catan.model.board.Vertex;
@@ -14,6 +15,6 @@ public interface ITurnState {
     boolean canEndTurn();
     boolean canRollDice();
     boolean endTurn(Turn currentTurn);
+    boolean playDevelopmentCard(IDevelopmentCard card, Turn currentTurn);
 }
-
 

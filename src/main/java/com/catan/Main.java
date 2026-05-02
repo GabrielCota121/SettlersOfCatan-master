@@ -2,10 +2,10 @@ package com.catan;
 
 import com.catan.model.board.*;
 import com.catan.model.building.Settlement;
+import com.catan.model.cards.IDevelopmentCard;
 import com.catan.model.game.CatanGameManager;
 import com.catan.model.game.ResourceType;
 import com.catan.model.game.Turn;
-import com.catan.model.game.Bank;
 import com.catan.model.logging.ConsoleLogger;
 import com.catan.model.logging.IGameLogger;
 import com.catan.model.player.Player;
@@ -15,6 +15,9 @@ import com.catan.model.state.SetupState;
 import com.catan.model.state.WaitingDiscardState;
 import com.catan.model.view.PieceDrawer;
 import com.catan.model.view.PlayerHandView;
+import com.catan.model.trade.TradeOffer;
+import com.catan.model.state.PlayerTradeState;
+
 import javafx.application.Application;
 import javafx.scene.Scene;
 import javafx.scene.canvas.Canvas;
@@ -28,7 +31,8 @@ import javafx.scene.paint.Color;
 import javafx.stage.Stage;
 import javafx.scene.control.Label;
 import javafx.scene.image.ImageView;
-
+import javafx.scene.control.Spinner;
+import javafx.scene.control.Button;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -45,7 +49,6 @@ public class Main extends Application {
     private final long MIN_FRAME_TIME_NS = 1_000_000_000 / 120;
     private int framesThisSecond = 0;
 
-    private static final Color OCEAN_COLOR = Color.web("#78b7e8");
     private static final Color EDGE_COLOR = Color.rgb(44, 62, 80, 0.55);
 
     private CatanGameManager gameManager;
@@ -53,6 +56,8 @@ public class Main extends Application {
     private final Map<ResourceType, Image> tileImages = new HashMap<>();
     private final Map<Integer, Image> numberImages = new HashMap<>();
     private final Map<String, Image> settlementImages = new HashMap<>();
+    private Image devCardDeckImage;
+    private final Map<String, Image> devCardImages = new HashMap<>();
     private final Map<String, Image> cityImages = new HashMap<>();
     private final Map<String, Image> roadImages = new HashMap<>();
     private final Map<String, Image> portImages = new HashMap<>();
@@ -80,10 +85,10 @@ public class Main extends Application {
 
         Board board = BoardFactory.createStandardBoard();
         List<Player> players = new ArrayList<>();
-        players.add(new Player(1, "Lucas", "PURPLE"));
-        players.add(new Player(2, "Gabriel", "LIGHTBLUE"));
-        players.add(new Player(3, "Juliana", "BRONZE"));
-        players.add(new Player(4, "Cauã", "BLACK"));
+        players.add(new Player(1, "Lucas", "GREEN"));
+        players.add(new Player(2, "Gabriel", "BLUE"));
+        players.add(new Player(3, "Juliana", "YELLOW"));
+        players.add(new Player(4, "Marcelle", "RED"));
 
         IGameLogger logger = new ConsoleLogger();
         gameManager = new CatanGameManager(board, players, logger);
@@ -122,8 +127,6 @@ public class Main extends Application {
             render(gc, board, false);
         });
 
-
-
         BorderPane root = new BorderPane();
         root.setStyle("-fx-background-color: #78b7e8;");
 
@@ -136,6 +139,9 @@ public class Main extends Application {
         canvas.heightProperty().addListener(observable -> render(gc, board, true));
 
         PlayerHandView handView = new PlayerHandView();
+
+        HBox devCardsBox = new HBox(10);
+        devCardsBox.setAlignment(javafx.geometry.Pos.CENTER);
 
         for (Player p : players) {
             p.getWallet().setOnWalletChangedListener(() -> {
@@ -159,7 +165,7 @@ public class Main extends Application {
             Image bankIcon = new Image(getClass().getResourceAsStream("/assets/bank/bankicon.png"));
             bankIconView.setImage(bankIcon);
         } catch (Exception e) {
-            System.out.println("CadÊ o ícone do Bank??");
+            System.out.println("Cadê o ícone do Bank??");
         }
 
         bankInfoBox.getChildren().addAll(bankNameLabel, bankIconView);
@@ -187,12 +193,13 @@ public class Main extends Application {
 
         Image passTurnImg = null;
         Image cantPassTurnImg = null;
+        Image tradeImg = null;
         Image[] diceImgs = new Image[7];
 
         try {
             passTurnImg = new Image(getClass().getResourceAsStream("/assets/passturn/passturn.png"));
             cantPassTurnImg = new Image(getClass().getResourceAsStream("/assets/passturn/cantpassturn.png"));
-
+            tradeImg = new Image(getClass().getResourceAsStream("/assets/trade/tradeicon.png"));
             for (int i = 1; i <= 6; i++) {
                 String path = "/assets/dice/"+i;
                 var stream = getClass().getResourceAsStream(path);
@@ -220,11 +227,86 @@ public class Main extends Application {
         HBox diceBox = new HBox(5, dice1View, dice2View);
         diceBox.setAlignment(javafx.geometry.Pos.CENTER);
 
-        VBox turnControlsBox = new VBox(15, diceBox, passTurnView);
+        ImageView tradeIconView = new ImageView(tradeImg);
+        tradeIconView.setFitHeight(50);
+        tradeIconView.setPreserveRatio(true);
+        tradeIconView.setCursor(javafx.scene.Cursor.HAND);
+
+        ImageView buyDevCardView = new ImageView(devCardDeckImage);
+        buyDevCardView.setFitHeight(60);
+        buyDevCardView.setPreserveRatio(true);
+        buyDevCardView.setCursor(javafx.scene.Cursor.HAND);
+
+        HBox diceAndTradeBox = new HBox(15, buyDevCardView, tradeIconView, diceBox);
+        diceAndTradeBox.setAlignment(javafx.geometry.Pos.CENTER);
+
+        VBox turnControlsBox = new VBox(15, diceAndTradeBox, passTurnView);
         turnControlsBox.setAlignment(javafx.geometry.Pos.CENTER);
 
         Image finalPassTurnImg = passTurnImg;
         Image finalCantPassTurnImg = cantPassTurnImg;
+
+
+        Runnable[] updateActionUIRef = new Runnable[1];
+
+        Runnable updateDevCardsUI = () -> {
+            devCardsBox.getChildren().clear();
+            Player currentPlayer = gameManager.getCurrentTurn().getCurrentPlayer();
+            ITurnState state = gameManager.getCurrentTurn().getState();
+
+            List<IDevelopmentCard> playableCards = currentPlayer.getPlayableCards();
+            List<IDevelopmentCard> newCards = currentPlayer.getNewCards();
+
+            List<IDevelopmentCard> allCards = new ArrayList<>();
+            if (playableCards != null) allCards.addAll(playableCards);
+            if (newCards != null) allCards.addAll(newCards);
+
+            if (!allCards.isEmpty()) {
+                for (IDevelopmentCard card : allCards) {
+                    ImageView cardView = new ImageView();
+                    cardView.setFitHeight(75);
+                    cardView.setPreserveRatio(true);
+
+                    boolean isCorrectState = state instanceof com.catan.model.state.MainState ||
+                            state instanceof com.catan.model.state.WaitingRollState;
+                    boolean isPlayable = playableCards != null && playableCards.contains(card);
+
+                    boolean canPlay = isCorrectState && isPlayable;
+
+                    cardView.setOpacity(canPlay ? 1.0 : 0.5);
+                    cardView.setCursor(canPlay ? javafx.scene.Cursor.HAND : javafx.scene.Cursor.DEFAULT);
+
+                    String cardName = card.getName().toLowerCase().replace(" ", "");
+                    try {
+                        Image cardImg = new Image(getClass().getResourceAsStream("/assets/developmentcards/" + cardName + ".png"));
+                        cardView.setImage(cardImg);
+                    } catch (Exception e) {
+                        System.out.println("Imagem da carta não encontrada: /assets/developmentcards/" + cardName + ".png");
+                    }
+
+                    cardView.setOnMouseClicked(e -> {
+                        if (!canPlay) {
+                            if (!isPlayable) {
+                                gameManager.getLogger().log("Você não pode jogar uma carta no mesmo turno em que a comprou!");
+                            } else {
+                                gameManager.getLogger().log("Você não pode jogar cartas de desenvolvimento agora!");
+                            }
+                            return;
+                        }
+
+                        boolean success = state.playDevelopmentCard(card, gameManager.getCurrentTurn());
+                        if (success) {
+                            if (updateActionUIRef[0] != null) {
+                                updateActionUIRef[0].run();
+                            }
+                        }
+                    });
+
+                    devCardsBox.getChildren().add(cardView);
+                }
+            }
+        };
+
         Runnable updateActionUI = () -> {
             ITurnState state = gameManager.getCurrentTurn().getState();
 
@@ -234,6 +316,13 @@ public class Main extends Application {
             diceBox.setCursor(state.canRollDice() ? javafx.scene.Cursor.HAND : javafx.scene.Cursor.DEFAULT);
             diceBox.setOpacity(state.canRollDice() ? 1.0 : 0.3);
 
+            boolean isMainState = state instanceof com.catan.model.state.MainState;
+            tradeIconView.setOpacity(isMainState ? 1.0 : 0.3);
+            tradeIconView.setCursor(isMainState ? javafx.scene.Cursor.HAND : javafx.scene.Cursor.DEFAULT);
+
+            buyDevCardView.setOpacity(isMainState ? 1.0 : 0.3);
+            buyDevCardView.setCursor(isMainState ? javafx.scene.Cursor.HAND : javafx.scene.Cursor.DEFAULT);
+
             int d1 = gameManager.getDice1().getResult();
             int d2 = gameManager.getDice2().getResult();
 
@@ -241,7 +330,10 @@ public class Main extends Application {
             if (d2 > 0 && d2 <= 6) dice2View.setImage(diceImgs[d2]);
 
             updateSidebar();
+            updateDevCardsUI.run();
         };
+
+        updateActionUIRef[0] = updateActionUI;
 
         Runnable bindPlayerToUI = () -> {
             Player currentPlayer = gameManager.getCurrentTurn().getCurrentPlayer();
@@ -274,9 +366,32 @@ public class Main extends Application {
             boolean success = currentTurn.getState().endTurn(currentTurn);
 
             if (!success) {
-                gameManager.getLogger().log("Ação inválida: Você não pode passar o turno agora!");
+                gameManager.getLogger().log("Você não pode passar o turno agora!");
             }
             updateActionUI.run();
+        });
+
+        tradeIconView.setOnMouseClicked(e -> {
+            ITurnState currentState = gameManager.getCurrentTurn().getState();
+            if (!(currentState instanceof com.catan.model.state.MainState)) {
+                gameManager.getLogger().log("Você só pode propor trocas na MainState!");
+                return;
+            }
+
+            buildTradeOptionsSidebar();
+        });
+
+        buyDevCardView.setOnMouseClicked(e -> {
+            ITurnState currentState = gameManager.getCurrentTurn().getState();
+            if (currentState instanceof com.catan.model.state.MainState) {
+                boolean success = currentState.buyDevelopmentCard(gameManager.getCurrentTurn());
+                if (!success) {
+                    gameManager.getLogger().log("Não tem recursos suficientes pra POP!");
+                }
+                updateActionUI.run();
+            } else {
+                gameManager.getLogger().log("Você só pode comprar cartas na sua Main State!");
+            }
         });
 
         canvas.setOnMouseReleased(event -> {
@@ -307,28 +422,23 @@ public class Main extends Application {
                         updateActionUI.run();
 
                     } else {
-                        buildStealVictimSidebar(victims, robberState, updateActionUI); // Passando o runnable aqui
+                        buildStealVictimSidebar(victims, robberState, updateActionUI);
                     }
                 }
                 render(gc, board, true);
                 return;
             }
 
-            Player currentPlayer = gameManager.getCurrentTurn().getCurrentPlayer();
-            String playerName = currentPlayer.getName();
-
             Vertex v = findVertexAt(board, worldX, worldY);
             if (v != null) {
                 boolean builtSettlement = currentState.buildSettlement(v, gameManager.getCurrentTurn());
 
                 if (builtSettlement) {
-                    gameManager.getLogger().log(playerName + " construiu um Settlement!");
                     updateActionUI.run();
                 } else {
                     boolean builtCity = currentState.buildCity(v, gameManager.getCurrentTurn());
 
                     if (builtCity) {
-                        gameManager.getLogger().log(playerName + " construiu uma City!");
                         updateActionUI.run();
                     }
                 }
@@ -337,7 +447,6 @@ public class Main extends Application {
                 if (e != null) {
                     boolean builtRoad = currentState.buildRoad(e, gameManager.getCurrentTurn());
                     if (builtRoad) {
-                        gameManager.getLogger().log(playerName + " construiu uma Road!");
                         updateActionUI.run();
                     }
                 }
@@ -345,12 +454,19 @@ public class Main extends Application {
             render(gc, board, true);
         });
 
+        rightSidebar = new VBox(15);
+        rightSidebar.setPrefWidth(350);
+        rightSidebar.setStyle("-fx-background-color: #34495e; -fx-padding: 20;");
+        rightSidebar.setAlignment(javafx.geometry.Pos.TOP_CENTER);
+        root.setRight(rightSidebar);
+
         bindPlayerToUI.run();
         gameManager.setOnTurnChangedListener(bindPlayerToUI);
 
         HBox bottomMenu = new HBox(20,
                 playerInfoBox,
                 handView,
+                devCardsBox,
                 spacer,
                 bankInfoBox,
                 bankHandView,
@@ -363,11 +479,7 @@ public class Main extends Application {
 
         root.setBottom(bottomMenu);
 
-        rightSidebar = new VBox(15);
-        rightSidebar.setPrefWidth(350);
-        rightSidebar.setStyle("-fx-background-color: #34495e; -fx-padding: 20;");
-        rightSidebar.setAlignment(javafx.geometry.Pos.TOP_CENTER);
-        root.setRight(rightSidebar);
+
 
         render(gc, board, true);
 
@@ -388,6 +500,298 @@ public class Main extends Application {
         };
         fpsTimer.start();
         primaryStage.show();
+    }
+
+    private void updateSidebar() {
+        if (rightSidebar == null) return;
+
+        rightSidebar.getChildren().clear();
+        ITurnState state = gameManager.getCurrentTurn().getState();
+
+        if (state instanceof WaitingDiscardState discardState) {
+            List<Player> pending = discardState.getPendingPlayers();
+            if (!pending.isEmpty()) {
+                buildDiscardSidebar(pending.get(0), discardState);
+            }
+        } else if (state instanceof PlayerTradeState tradeState) {
+            buildPlayerTradeResponseSidebar(tradeState);
+        } else if (state instanceof com.catan.model.state.MonopolyState) {
+            buildMonopolySidebar();
+        } else if (state instanceof com.catan.model.state.YearOfPlentyState) {
+            buildYearOfPlentySidebar();
+        }
+        buildPlayerOverviewSidebar();
+    }
+
+    private void buildMonopolySidebar() {
+        rightSidebar.getChildren().clear();
+
+        Label titleLabel = new Label("Monopoly");
+        titleLabel.setStyle("-fx-text-fill: white; -fx-font-size: 20px; -fx-font-weight: bold;");
+
+        Label infoLabel = new Label("Escolha o recurso para monopolizar!");
+        infoLabel.setStyle("-fx-text-fill: white; -fx-wrap-text: true; -fx-text-alignment: center;");
+
+        javafx.scene.control.ComboBox<ResourceType> resourceCombo = new javafx.scene.control.ComboBox<>();
+        for (ResourceType type : ResourceType.values()) {
+            if (type != ResourceType.DESERT) resourceCombo.getItems().add(type);
+        }
+
+        Button confirmBtn = new Button("Monopolizar Recurso!");
+        confirmBtn.setStyle("-fx-font-weight: bold; -fx-base: #9b59b6; -fx-pref-width: 150px;");
+
+        confirmBtn.setOnAction(e -> {
+            ResourceType selected = resourceCombo.getValue();
+            if (selected != null) {
+                ITurnState state = gameManager.getCurrentTurn().getState();
+                if (state instanceof com.catan.model.state.MonopolyState) {
+                    ((com.catan.model.state.MonopolyState) state).chooseResource(selected, gameManager.getCurrentTurn());
+
+                    updateSidebar();
+                }
+            } else {
+                gameManager.getLogger().log("Selecione um recurso primeiro, doidão!");
+            }
+        });
+
+        rightSidebar.getChildren().addAll(titleLabel, infoLabel, resourceCombo, confirmBtn);
+    }
+
+    private void buildYearOfPlentySidebar() {
+        rightSidebar.getChildren().clear();
+
+        Label titleLabel = new Label("Year of Plenty");
+        titleLabel.setStyle("-fx-text-fill: white; -fx-font-size: 20px; -fx-font-weight: bold;");
+
+        Label infoLabel = new Label("Escolha 2 recursos para pegar do banco!");
+        infoLabel.setStyle("-fx-text-fill: white; -fx-wrap-text: true; -fx-text-alignment: center;");
+
+        HBox combosBox = new HBox(10);
+        combosBox.setAlignment(javafx.geometry.Pos.CENTER);
+
+        javafx.scene.control.ComboBox<ResourceType> res1Combo = new javafx.scene.control.ComboBox<>();
+        javafx.scene.control.ComboBox<ResourceType> res2Combo = new javafx.scene.control.ComboBox<>();
+
+        for (ResourceType type : ResourceType.values()) {
+            if (type != ResourceType.DESERT) {
+                res1Combo.getItems().add(type);
+                res2Combo.getItems().add(type);
+            }
+        }
+        combosBox.getChildren().addAll(res1Combo, res2Combo);
+
+        Button confirmBtn = new Button("Pegar Recursos");
+        confirmBtn.setStyle("-fx-font-weight: bold; -fx-base: #2ecc71; -fx-pref-width: 150px;");
+
+        confirmBtn.setOnAction(e -> {
+            ResourceType r1 = res1Combo.getValue();
+            ResourceType r2 = res2Combo.getValue();
+
+            if (r1 != null && r2 != null) {
+                ITurnState state = gameManager.getCurrentTurn().getState();
+                if (state instanceof com.catan.model.state.YearOfPlentyState) {
+                    ((com.catan.model.state.YearOfPlentyState) state).chooseResources(r1, r2, gameManager.getCurrentTurn());
+
+                    updateSidebar();
+                }
+            } else {
+                gameManager.getLogger().log("Selecione os dois recursos primeiro!");
+            }
+        });
+
+        rightSidebar.getChildren().addAll(titleLabel, infoLabel, combosBox, confirmBtn);
+    }
+
+    private void buildTradeOptionsSidebar() {
+        rightSidebar.getChildren().clear();
+
+        Label titleLabel = new Label("Troca!");
+        titleLabel.setStyle("-fx-text-fill: white; -fx-font-size: 20px; -fx-font-weight: bold;");
+
+        javafx.scene.control.Button btnBank = new javafx.scene.control.Button("Trocar com o Banco");
+        btnBank.setStyle("-fx-font-weight: bold; -fx-base: #3498db; -fx-pref-width: 200px;");
+        btnBank.setOnAction(e -> buildBankTradeSidebar());
+
+        javafx.scene.control.Button btnPlayers = new javafx.scene.control.Button("Trocar com Jogadores");
+        btnPlayers.setStyle("-fx-font-weight: bold; -fx-base: #9b59b6; -fx-pref-width: 200px;");
+        btnPlayers.setOnAction(e -> buildPlayerTradeCreationSidebar());
+
+        javafx.scene.control.Button btnCancel = new javafx.scene.control.Button("Cancelar");
+        btnCancel.setStyle("-fx-font-weight: bold; -fx-base: #e74c3c; -fx-pref-width: 200px;");
+        btnCancel.setOnAction(e -> updateSidebar());
+
+        rightSidebar.getChildren().addAll(titleLabel, btnBank, btnPlayers, btnCancel);
+    }
+
+    private void buildPlayerTradeCreationSidebar() {
+        rightSidebar.getChildren().clear();
+        Player proposer = gameManager.getCurrentTurn().getCurrentPlayer();
+
+        Label titleLabel = new Label("Criar Proposta");
+        titleLabel.setStyle("-fx-text-fill: white; -fx-font-size: 18px; -fx-font-weight: bold;");
+
+        VBox offerBox = new VBox(5);
+        Label offerLabel = new Label("Ofereço:");
+        offerLabel.setStyle("-fx-text-fill: #2ecc71; -fx-font-weight: bold;");
+        offerBox.getChildren().add(offerLabel);
+
+        VBox requestBox = new VBox(5);
+        Label requestLabel = new Label("Quero:");
+        requestLabel.setStyle("-fx-text-fill: #e74c3c; -fx-font-weight: bold;");
+        requestBox.getChildren().add(requestLabel);
+
+        Map<ResourceType, Spinner<Integer>> offerSpinners = new HashMap<>();
+        Map<ResourceType, Spinner<Integer>> requestSpinners = new HashMap<>();
+
+        for (ResourceType type : ResourceType.values()) {
+            if (type == ResourceType.DESERT) continue;
+
+            int playerHas = proposer.getWallet().getResourceAmount(type);
+            Spinner<Integer> offerSpinner = new Spinner<>(0, playerHas, 0);
+            offerSpinner.setPrefWidth(70);
+            offerSpinners.put(type, offerSpinner);
+
+            HBox offerRow = new HBox(10, new Label(type.name()), offerSpinner);
+            offerRow.setAlignment(javafx.geometry.Pos.CENTER_RIGHT);
+            offerRow.getChildren().get(0).setStyle("-fx-text-fill: white;");
+            offerBox.getChildren().add(offerRow);
+
+            Spinner<Integer> requestSpinner = new Spinner<>(0, 99, 0);
+            requestSpinner.setPrefWidth(70);
+            requestSpinners.put(type, requestSpinner);
+
+            HBox requestRow = new HBox(10, new Label(type.name()), requestSpinner);
+            requestRow.setAlignment(javafx.geometry.Pos.CENTER_RIGHT);
+            requestRow.getChildren().get(0).setStyle("-fx-text-fill: white;");
+            requestBox.getChildren().add(requestRow);
+        }
+
+        Button confirmBtn = new Button("Fazer Proposta");
+        confirmBtn.setStyle("-fx-font-weight: bold; -fx-base: #9b59b6;");
+
+        confirmBtn.setOnAction(e -> {
+            Map<ResourceType, Integer> offered = new HashMap<>();
+            Map<ResourceType, Integer> requested = new HashMap<>();
+
+            for (ResourceType type : ResourceType.values()) {
+                if (type == ResourceType.DESERT) continue;
+                offered.put(type, offerSpinners.get(type).getValue());
+                requested.put(type, requestSpinners.get(type).getValue());
+            }
+
+            try {
+                TradeOffer offer = new TradeOffer(proposer, offered, requested);
+
+                Turn currentTurn = gameManager.getCurrentTurn();
+                currentTurn.setState(new PlayerTradeState(offer, gameManager.getPlayers()));
+                updateSidebar();
+
+            } catch (IllegalArgumentException ex) {
+                gameManager.getLogger().log(ex.getMessage());
+            }
+        });
+
+        Button cancelBtn = new Button("Voltar");
+        cancelBtn.setStyle("-fx-font-weight: bold; -fx-base: #95a5a6;");
+        cancelBtn.setOnAction(e -> buildTradeOptionsSidebar());
+
+        HBox buttonsBox = new HBox(10, confirmBtn, cancelBtn);
+        buttonsBox.setAlignment(javafx.geometry.Pos.CENTER);
+
+        rightSidebar.getChildren().addAll(titleLabel, offerBox, requestBox, buttonsBox);
+    }
+
+    private void buildBankTradeSidebar() {
+        rightSidebar.getChildren().clear();
+        Player player = gameManager.getCurrentTurn().getCurrentPlayer();
+
+        Label titleLabel = new Label("Troca Marítima");
+        titleLabel.setStyle("-fx-text-fill: white; -fx-font-size: 18px; -fx-font-weight: bold;");
+
+        Label offerLabel = new Label("Oferecer:");
+        offerLabel.setStyle("-fx-text-fill: white;");
+        javafx.scene.control.ComboBox<ResourceType> offerCombo = new javafx.scene.control.ComboBox<>();
+        for (ResourceType type : ResourceType.values()) {
+            if (type != ResourceType.DESERT) offerCombo.getItems().add(type);
+        }
+
+        Label receiveLabel = new Label("Receber 1x:");
+        receiveLabel.setStyle("-fx-text-fill: white;");
+        javafx.scene.control.ComboBox<ResourceType> receiveCombo = new javafx.scene.control.ComboBox<>();
+        for (ResourceType type : ResourceType.values()) {
+            if (type != ResourceType.DESERT) receiveCombo.getItems().add(type);
+        }
+
+        Label infoLabel = new Label("Selecione os recursos:");
+        infoLabel.setStyle("-fx-text-fill: yellow; -fx-wrap-text: true; -fx-text-alignment: center;");
+
+        javafx.scene.control.Button confirmBtn = new javafx.scene.control.Button("ConfirmarS");
+        confirmBtn.setDisable(true);
+        confirmBtn.setStyle("-fx-font-weight: bold; -fx-base: #2ecc71;");
+
+        Runnable checkTradeValidity = () -> {
+            ResourceType offer = offerCombo.getValue();
+            ResourceType receive = receiveCombo.getValue();
+
+            if (offer != null && receive != null) {
+                if (offer == receive) {
+                    infoLabel.setText("Você não pode trocar recursos iguais!");
+                    infoLabel.setStyle("-fx-text-fill: #e74c3c;");
+                    confirmBtn.setDisable(true);
+                    return;
+                }
+
+                int rate = player.getTradeRate(offer);
+                int playerHas = player.getWallet().getResourceAmount(offer);
+
+                if (playerHas >= rate) {
+                    if (gameManager.getBank().getWallet().getResourceAmount(receive) >= 1) {
+                        infoLabel.setText("Taxa: " + rate + " " + offer.name() + " por 1 " + receive.name());
+                        infoLabel.setStyle("-fx-text-fill: #2ecc71;");
+                        confirmBtn.setDisable(false);
+                    } else {
+                        infoLabel.setText("O Banco não tem " + receive.name() + " suficiente!");
+                        infoLabel.setStyle("-fx-text-fill: #e74c3c;");
+                        confirmBtn.setDisable(true);
+                    }
+                } else {
+                    infoLabel.setText("Você precisa de " + rate + " " + offer.name() + ", mas só tem " + playerHas + ".");
+                    infoLabel.setStyle("-fx-text-fill: #e74c3c;");
+                    confirmBtn.setDisable(true);
+                }
+            }
+        };
+
+        offerCombo.setOnAction(e -> checkTradeValidity.run());
+        receiveCombo.setOnAction(e -> checkTradeValidity.run());
+
+        confirmBtn.setOnAction(e -> {
+            ResourceType offer = offerCombo.getValue();
+            ResourceType receive = receiveCombo.getValue();
+            int rate = player.getTradeRates().getOrDefault(offer, 4);
+
+            player.getWallet().removeResource(offer, rate);
+            gameManager.getBank().getWallet().addResource(offer, rate);
+
+            gameManager.getBank().getWallet().removeResource(receive, 1);
+            player.getWallet().addResource(receive, 1);
+
+            gameManager.getLogger().log(player.getName() + " trocou " + rate + " " + offer + " por 1 " + receive + ".");
+            updateSidebar();
+        });
+
+        javafx.scene.control.Button btnCancel = new javafx.scene.control.Button("Voltar");
+        btnCancel.setStyle("-fx-font-weight: bold; -fx-base: #95a5a6;");
+        btnCancel.setOnAction(e -> buildTradeOptionsSidebar());
+
+        rightSidebar.getChildren().addAll(
+                titleLabel,
+                offerLabel, offerCombo,
+                receiveLabel, receiveCombo,
+                infoLabel,
+                confirmBtn,
+                btnCancel
+        );
     }
 
     private void render(GraphicsContext gc, Board board, boolean force) {
@@ -436,6 +840,13 @@ public class Main extends Application {
             dockImages.put("-30", new Image(getClass().getResourceAsStream("/assets/dock/dockneg30.png")));
 
             robberImage = new Image(getClass().getResourceAsStream("/assets/robber/robber.png"));
+
+            devCardDeckImage = new Image(getClass().getResourceAsStream("/assets/developmentcards/development.png"));
+            devCardImages.put("Knight", new Image(getClass().getResourceAsStream("/assets/developmentcards/knight.png")));
+            devCardImages.put("Monopoly", new Image(getClass().getResourceAsStream("/assets/developmentcards/monopoly.png")));
+            devCardImages.put("Road Building", new Image(getClass().getResourceAsStream("/assets/developmentcards/roadbuilding.png")));
+            devCardImages.put("Victory Point", new Image(getClass().getResourceAsStream("/assets/developmentcards/victorypoint.png")));
+            devCardImages.put("Year of Plenty", new Image(getClass().getResourceAsStream("/assets/developmentcards/yearofplenty.png")));
 
         } catch (Exception e) {
             System.err.println("Não achou os assets: " + e.getMessage() + " doidão!");
@@ -519,10 +930,6 @@ public class Main extends Application {
                 Image roadImg = roadImages.get(getAssetColorName(owner));
                 PieceDrawer.drawRoad(gc, edge.getV1().getX(), edge.getV1().getY(),
                         edge.getV2().getX(), edge.getV2().getY(), roadImg);
-            } else {
-                gc.setStroke(EDGE_COLOR);
-                gc.setLineWidth(1.5);
-                gc.strokeLine(edge.getV1().getX(), edge.getV1().getY(), edge.getV2().getX(), edge.getV2().getY());
             }
         }
     }
@@ -631,22 +1038,170 @@ public class Main extends Application {
         }
     }
 
-    private void updateSidebar() {
-        if (rightSidebar == null) return;
 
+    private void buildPlayerTradeResponseSidebar(PlayerTradeState tradeState) {
         rightSidebar.getChildren().clear();
-        ITurnState state = gameManager.getCurrentTurn().getState();
+        Turn currentTurn = gameManager.getCurrentTurn();
 
-        if (state instanceof WaitingDiscardState discardState) {
-            List<Player> pending = discardState.getPendingPlayers();
+        Label titleLabel = new Label("Negociação");
+        titleLabel.setStyle("-fx-text-fill: white; -fx-font-size: 18px; -fx-font-weight: bold;");
 
-            if (!pending.isEmpty()) {
-                buildDiscardSidebar(pending.get(0), discardState);
+        if (tradeState.isWaitingForProposer()) {
+            Label infoLabel = new Label(tradeState.getOffer().getProposer().getName() + ", escolha com quem trocar:");
+            infoLabel.setStyle("-fx-text-fill: yellow; -fx-wrap-text: true;");
+            rightSidebar.getChildren().addAll(titleLabel, infoLabel);
+
+            for (Player acceptedPlayer : tradeState.getOffer().getAcceptedBy()) {
+                Button acceptPartnerBtn = new Button("Fechar com " + acceptedPlayer.getName());
+                acceptPartnerBtn.setStyle("-fx-base: #2ecc71; -fx-font-weight: bold;");
+                acceptPartnerBtn.setOnAction(e -> {
+                    tradeState.executeTrade(acceptedPlayer, currentTurn);
+                    updateSidebar();
+                });
+                rightSidebar.getChildren().add(acceptPartnerBtn);
             }
-        } else {
-            Label infoLabel = new Label("");
-            infoLabel.setStyle("-fx-text-fill: gray; -fx-font-style: italic;");
-            rightSidebar.getChildren().add(infoLabel);
+
+            Button cancelBtn = new Button("Cancelar Troca");
+            cancelBtn.setStyle("-fx-base: #e74c3c; -fx-font-weight: bold;");
+            cancelBtn.setOnAction(e -> {
+                tradeState.cancelTrade(currentTurn);
+                updateSidebar();
+            });
+            rightSidebar.getChildren().add(cancelBtn);
+            return;
+        }
+
+        Player target = tradeState.getCurrentTargetPlayer();
+        if (target != null) {
+            Label targetLabel = new Label("Vez de " + target.getName() + " responder!");
+            targetLabel.setStyle("-fx-text-fill: #3498db; -fx-font-size: 16px; -fx-font-weight: bold;");
+
+            Label offerLabel = new Label(tradeState.getOffer().getProposer().getName() + " ofereceu uma troca.");
+            offerLabel.setStyle("-fx-text-fill: white;");
+
+            Button btnAccept = new Button("Aceitar");
+            btnAccept.setStyle("-fx-base: #2ecc71; -fx-font-weight: bold;");
+
+            if (!tradeState.getOffer().canPlayerAfford(target)) {
+                btnAccept.setDisable(true);
+                btnAccept.setText("Sem Recursos");
+            }
+
+            btnAccept.setOnAction(e -> {
+                tradeState.registerResponse(true, currentTurn);
+                updateSidebar();
+            });
+
+            Button btnReject = new Button("Recusar");
+            btnReject.setStyle("-fx-base: #e74c3c; -fx-font-weight: bold;");
+            btnReject.setOnAction(e -> {
+                tradeState.registerResponse(false, currentTurn);
+                updateSidebar();
+            });
+
+            HBox buttons = new HBox(10, btnAccept, btnReject);
+            buttons.setAlignment(javafx.geometry.Pos.CENTER);
+
+            rightSidebar.getChildren().addAll(titleLabel, targetLabel, offerLabel, buttons);
+        }
+    }
+
+    private void buildPlayerOverviewSidebar() {
+        javafx.scene.layout.Region spacer = new javafx.scene.layout.Region();
+        javafx.scene.layout.VBox.setVgrow(spacer, javafx.scene.layout.Priority.ALWAYS);
+        rightSidebar.getChildren().add(spacer);
+
+        javafx.scene.control.Separator separator = new javafx.scene.control.Separator();
+        separator.setStyle("-fx-padding: 10 0 5 0;");
+        rightSidebar.getChildren().add(separator);
+
+
+        for (Player p : gameManager.getPlayers()) {
+            HBox playerBox = new HBox(15);
+            playerBox.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+            playerBox.setStyle("-fx-background-color: #2c3e50; -fx-padding: 8; -fx-background-radius: 8;");
+
+            VBox settlementBox = new VBox(2);
+            settlementBox.setAlignment(javafx.geometry.Pos.CENTER);
+
+            Label vpLabel = new Label(p.getVictoryPoints() + " \u2605");
+            vpLabel.setStyle("-fx-text-fill: #f1c40f; -fx-font-weight: bold; -fx-font-size: 20px;");
+
+            ImageView iconView = new ImageView();
+            iconView.setFitHeight(25);
+            iconView.setPreserveRatio(true);
+            String colorName = p.getColor().toLowerCase();
+            try {
+                Image iconImg = new Image(getClass().getResource("/assets/settlement/" + colorName + "set.png").toExternalForm());
+                iconView.setImage(iconImg);
+            } catch (Exception e) {
+                System.out.println("Erro ao carregar settlement no overview: " + colorName);
+            }
+
+            settlementBox.getChildren().addAll(vpLabel, iconView);
+
+            VBox infoBox = new VBox(5);
+            infoBox.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+
+            Label nameLabel = new Label(p.getName());
+            nameLabel.setStyle("-fx-text-fill: white; -fx-font-weight: bold; -fx-font-size: 20px;");
+
+            int numResources = p.getWallet().getTotalCards();
+            int numDevCards = 0;
+            if (p.getPlayableCards() != null) numDevCards += p.getPlayableCards().size();
+            if (p.getNewCards() != null) numDevCards += p.getNewCards().size();
+            int numKnights = p.getNumKnights();
+            int longestRoad = p.getLongestRoad();
+
+            HBox statsBox = new HBox(12);
+            statsBox.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+
+            HBox resBox = new HBox(5);
+            resBox.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+            ImageView resIcon = new ImageView();
+            resIcon.setFitHeight(25);
+            resIcon.setPreserveRatio(true);
+            try { resIcon.setImage(new Image(getClass().getResourceAsStream("/assets/resources/resourceback.png"))); } catch(Exception e){}
+            Label resLabel = new Label(String.valueOf(numResources));
+            resLabel.setStyle("-fx-text-fill: #bdc3c7; -fx-font-weight: bold; -fx-font-size: 20px;");
+            resBox.getChildren().addAll(resIcon, resLabel);
+
+            HBox devBox = new HBox(5);
+            devBox.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+            ImageView devIcon = new ImageView();
+            devIcon.setFitHeight(25);
+            devIcon.setPreserveRatio(true);
+            try { devIcon.setImage(new Image(getClass().getResourceAsStream("/assets/developmentcards/development.png"))); } catch(Exception e){}
+            Label devLabel = new Label(String.valueOf(numDevCards));
+            devLabel.setStyle("-fx-text-fill: #bdc3c7; -fx-font-weight: bold; -fx-font-size: 20px;");
+            devBox.getChildren().addAll(devIcon, devLabel);
+
+            HBox knightBox = new HBox(5);
+            knightBox.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+            ImageView knightIcon = new ImageView();
+            knightIcon.setFitHeight(25);
+            knightIcon.setPreserveRatio(true);
+            try { knightIcon.setImage(new Image(getClass().getResourceAsStream("/assets/bonus/largestarmy.png"))); } catch(Exception e){}
+            Label knightLabel = new Label(String.valueOf(numKnights));
+            knightLabel.setStyle("-fx-text-fill: #bdc3c7; -fx-font-weight: bold; -fx-font-size: 20px;");
+            knightBox.getChildren().addAll(knightIcon, knightLabel);
+
+            HBox roadBox = new HBox(5);
+            roadBox.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+            ImageView roadIcon = new ImageView();
+            roadIcon.setFitHeight(25);
+            roadIcon.setPreserveRatio(true);
+            try { roadIcon.setImage(new Image(getClass().getResourceAsStream("/assets/bonus/longestroad.png"))); } catch(Exception e){}
+            Label roadLabel = new Label(String.valueOf(longestRoad));
+            roadLabel.setStyle("-fx-text-fill: #bdc3c7; -fx-font-weight: bold; -fx-font-size: 20px;");
+            roadBox.getChildren().addAll(roadIcon, roadLabel);
+
+            statsBox.getChildren().addAll(resBox, devBox, knightBox, roadBox);
+            infoBox.getChildren().addAll(nameLabel, statsBox);
+
+            playerBox.getChildren().addAll(settlementBox, infoBox);
+
+            rightSidebar.getChildren().add(playerBox);
         }
     }
 
