@@ -1,5 +1,6 @@
 package com.catan.model.player;
 
+import com.catan.model.building.BuildingCost;
 import com.catan.model.cards.IDevelopmentCard;
 import com.catan.model.game.ResourceType;
 
@@ -86,6 +87,10 @@ public class Player {
             playableCards.addAll(newCards);
             newCards.clear();
         }
+    }
+
+    public boolean canAfford(BuildingCost building) {
+        return wallet.hasEnoughResources(building.getCost());
     }
 
     public int getId() { return id; }

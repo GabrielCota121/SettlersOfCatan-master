@@ -8,6 +8,6 @@ public class WebSocketLogger implements IGameLogger {
 
     @Override
     public void error(String message) {
-        //TODO sõ deixei pronto essa carniça
+        System.err.println("[ERRO] " + message);
     }
 }

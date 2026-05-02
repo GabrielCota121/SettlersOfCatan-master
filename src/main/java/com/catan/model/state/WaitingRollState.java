@@ -14,7 +14,7 @@ import java.util.List;
 public class WaitingRollState implements ITurnState {
 
     @Override
-    public String getName() { return "Aguardando Rolar os dados!"; }
+    public String getName() { return "Aguardando rolar os dados!"; }
 
     @Override
     public boolean rollDice(Turn currentTurn) {
@@ -26,7 +26,7 @@ public class WaitingRollState implements ITurnState {
         manager.getLogger().log(currentTurn.getCurrentPlayer().getName() + " rolou: " + total);
 
         if (total == 7) {
-            manager.getLogger().log("Rolou 7! Verificando limite de cartas");
+            manager.getLogger().log("Verificando limite de 7 cartas");
             List<Player> playersToDiscard = new ArrayList<>();
             for (Player p : manager.getPlayers()) {
                 if (p.getWallet().getTotalCards() >= 8) {
@@ -35,7 +35,9 @@ public class WaitingRollState implements ITurnState {
             }
 
             if (playersToDiscard.isEmpty()) {
-                manager.getLogger().log("Ninguém tem mais de 7 cartas!. Clique em um tile para mover o Ladrão!");
+                manager.getLogger().log("Ninguém tem mais de 7 cartas!");
+                manager.getLogger().log("Clique em um tile para mover o robber!");
+
                 currentTurn.setState(new MoveRobberState(new MainState()));
             } else {
                 manager.getLogger().log("Alguns jogadores precisam descartar cartas!");

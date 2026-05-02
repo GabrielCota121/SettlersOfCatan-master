@@ -39,7 +39,7 @@ public class SetupState implements ITurnState {
         activePlayer.incrementSettlements();
         activePlayer.incrementVictoryPoints();
         IGameLogger logger = currentTurn.getGameManager().getLogger();
-        logger.log(activePlayer.getName() + " construiu um Settlement!");
+        logger.log(activePlayer.getName() + " construiu um settlement!");
 
         if (isSecondPass) {
             Bank bank = currentTurn.getGameManager().getBank();
@@ -52,7 +52,7 @@ public class SetupState implements ITurnState {
                     if (bank.getWallet().getResourceAmount(type) >= yield) {
                         bank.getWallet().removeResource(type, yield);
                         activePlayer.getWallet().addResource(type, yield);
-                        logger.log(activePlayer.getName() + " recebeu " + yield + " " + type);
+                        logger.log(activePlayer.getName() + " colocou seu segundo settlement e recebe " + yield + " " + type);
                     }
                 }
             }
@@ -88,6 +88,9 @@ public class SetupState implements ITurnState {
 
         edge.setBuilding(new Road(activePlayer, edge));
         roadPlaced = true;
+        IGameLogger logger = currentTurn.getGameManager().getLogger();
+        logger.log(activePlayer.getName() + " construiu uma road!");
+
         activePlayer.incrementRoads();
 
         // Só pra aparecer também a maior estrada do jogador no SetupState!

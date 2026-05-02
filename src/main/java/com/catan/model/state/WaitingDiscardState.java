@@ -26,7 +26,7 @@ public class WaitingDiscardState implements ITurnState {
 
     @Override
     public String getName() {
-        return "Aguardando descartarem as cartas! BORA CARAI!!";
+        return "Aguardando descartarem as cartas! BORA !!";
     }
 
     public List<Player> getPendingPlayers() {
@@ -35,7 +35,7 @@ public class WaitingDiscardState implements ITurnState {
 
     public boolean submitDiscard(Player player, Map<ResourceType, Integer> discardSelection, Turn currentTurn) {
         if (!pendingPlayers.contains(player)) {
-            currentTurn.getGameManager().getLogger().log(player.getName() + " não precisa descartar cartas.");
+            currentTurn.getGameManager().getLogger().log(player.getName() + " não precisa descartar cartas!");
             return false;
         }
 
@@ -48,7 +48,7 @@ public class WaitingDiscardState implements ITurnState {
         }
         confirmedDiscards.put(player, discardSelection);
         pendingPlayers.remove(player);
-        currentTurn.getGameManager().getLogger().log(player.getName() + " confirmou suas cartas para descarte.");
+        currentTurn.getGameManager().getLogger().log(player.getName() + " confirmou suas cartas para descarte!");
         checkCompletion(currentTurn);
         return true;
     }
@@ -57,7 +57,7 @@ public class WaitingDiscardState implements ITurnState {
         if (pendingPlayers.isEmpty()) {
             CatanGameManager manager = currentTurn.getGameManager();
             Bank bank = manager.getBank();
-            manager.getLogger().log("Todos os descartes recebidos. Processando devolução ao banco...");
+            manager.getLogger().log("Todos os descartes recebidos!");
 
             for (Map.Entry<Player, Map<ResourceType, Integer>> entry : confirmedDiscards.entrySet()) {
                 Player p = entry.getKey();
@@ -71,7 +71,7 @@ public class WaitingDiscardState implements ITurnState {
                 manager.getLogger().log(p.getName() + " descartou " + discards);
             }
 
-            manager.getLogger().log("Mova o ladrão!");
+            manager.getLogger().log("Agora mova o robber!!");
             currentTurn.setState(new MoveRobberState(new MainState()));
         }
     }

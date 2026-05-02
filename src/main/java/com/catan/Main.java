@@ -1,6 +1,7 @@
 package com.catan;
 
 import com.catan.model.board.*;
+import com.catan.model.building.BuildingCost;
 import com.catan.model.building.Settlement;
 import com.catan.model.cards.IDevelopmentCard;
 import com.catan.model.game.CatanGameManager;
@@ -8,6 +9,7 @@ import com.catan.model.game.ResourceType;
 import com.catan.model.game.Turn;
 import com.catan.model.logging.ConsoleLogger;
 import com.catan.model.logging.IGameLogger;
+import com.catan.model.logging.WebSocketLogger;
 import com.catan.model.player.Player;
 import com.catan.model.state.ITurnState;
 import com.catan.model.state.MoveRobberState;
@@ -33,6 +35,8 @@ import javafx.scene.control.Label;
 import javafx.scene.image.ImageView;
 import javafx.scene.control.Spinner;
 import javafx.scene.control.Button;
+import javafx.scene.control.TextArea;
+import javafx.application.Platform;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -90,11 +94,28 @@ public class Main extends Application {
         players.add(new Player(3, "Juliana", "YELLOW"));
         players.add(new Player(4, "Marcelle", "RED"));
 
-        IGameLogger logger = new ConsoleLogger();
+
+        TextArea logArea = new TextArea();
+        logArea.setEditable(false);
+        logArea.setWrapText(true);
+        logArea.setStyle("-fx-control-inner-background: #2c3e50; -fx-text-fill: #ecf0f1; -fx-font-family: 'Consolas'; -fx-font-size: 14px;");
+        logArea.setPrefWidth(350);
+
+        // Mudei pra pra usar o logArea!
+        IGameLogger logger = new WebSocketLogger() {
+            @Override
+            public void log(String message) {
+                Platform.runLater(() -> {
+                    logArea.appendText("🎲 " + message + "\n");
+                });
+            }
+        };
+
         gameManager = new CatanGameManager(board, players, logger);
         gameManager.getCurrentTurn().setState(new SetupState(false));
+        logger.log("Bem-vindo à Ilha de Catan! GLGL!");
         logger.log("Fase atual: " + gameManager.getCurrentTurn().getState().getName());
-        logger.log("Vez de " + gameManager.getCurrentTurn().getCurrentPlayer().getName());
+        logger.log(gameManager.getCurrentTurn().getCurrentPlayer().getName() + " começa!");
 
         Canvas canvas = new Canvas(WIDTH, HEIGHT);
         GraphicsContext gc = canvas.getGraphicsContext2D();
@@ -154,7 +175,7 @@ public class Main extends Application {
         VBox bankInfoBox = new VBox(5);
         bankInfoBox.setAlignment(javafx.geometry.Pos.CENTER);
 
-        Label bankNameLabel = new Label("BANCO");
+        Label bankNameLabel = new Label("Bank");
         bankNameLabel.setStyle("-fx-font-size: 20px; -fx-font-weight: bold; -fx-text-fill: #ecf0f1;");
 
         ImageView bankIconView = new ImageView();
@@ -309,6 +330,7 @@ public class Main extends Application {
 
         Runnable updateActionUI = () -> {
             ITurnState state = gameManager.getCurrentTurn().getState();
+            Player currentPlayer = gameManager.getCurrentTurn().getCurrentPlayer();
 
             passTurnView.setImage(state.canEndTurn() ? finalPassTurnImg : finalCantPassTurnImg);
             passTurnView.setCursor(state.canEndTurn() ? javafx.scene.Cursor.HAND : javafx.scene.Cursor.DEFAULT);
@@ -317,10 +339,11 @@ public class Main extends Application {
             diceBox.setOpacity(state.canRollDice() ? 1.0 : 0.3);
 
             boolean isMainState = state instanceof com.catan.model.state.MainState;
-            tradeIconView.setOpacity(isMainState ? 1.0 : 0.3);
+            tradeIconView.setOpacity(isMainState? 1.0 : 0.3);
             tradeIconView.setCursor(isMainState ? javafx.scene.Cursor.HAND : javafx.scene.Cursor.DEFAULT);
 
-            buyDevCardView.setOpacity(isMainState ? 1.0 : 0.3);
+            //Vai checar se ele pode comrpar a devcard
+            buyDevCardView.setOpacity((isMainState && currentPlayer.canAfford(BuildingCost.DEVELOPMENT_CARD)) ? 1.0 : 0.3);
             buyDevCardView.setCursor(isMainState ? javafx.scene.Cursor.HAND : javafx.scene.Cursor.DEFAULT);
 
             int d1 = gameManager.getDice1().getResult();
@@ -390,7 +413,7 @@ public class Main extends Application {
                 }
                 updateActionUI.run();
             } else {
-                gameManager.getLogger().log("Você só pode comprar cartas na sua Main State!");
+                gameManager.getLogger().log("Você só pode comprar devcard na sua Main State!");
             }
         });
 
@@ -460,6 +483,15 @@ public class Main extends Application {
         rightSidebar.setAlignment(javafx.geometry.Pos.TOP_CENTER);
         root.setRight(rightSidebar);
 
+        VBox leftSidebar = new VBox(10);
+        leftSidebar.setStyle("-fx-background-color: #34495e; -fx-padding: 10;");
+        Label logTitle = new Label("Histórico");
+        logTitle.setStyle("-fx-text-fill: white; -fx-font-size: 18px; -fx-font-weight: bold;");
+        leftSidebar.getChildren().addAll(logTitle, logArea);
+        javafx.scene.layout.VBox.setVgrow(logArea, javafx.scene.layout.Priority.ALWAYS);
+
+        root.setLeft(leftSidebar);
+
         bindPlayerToUI.run();
         gameManager.setOnTurnChangedListener(bindPlayerToUI);
 
@@ -478,12 +510,44 @@ public class Main extends Application {
         HBox.setHgrow(spacer, javafx.scene.layout.Priority.ALWAYS);
 
         root.setBottom(bottomMenu);
-
-
-
         render(gc, board, true);
 
         Scene scene = new Scene(root, WIDTH, HEIGHT);
+        scene.addEventFilter(javafx.scene.input.KeyEvent.KEY_PRESSED, event -> {
+            int playerIndex = -1;
+
+            switch (event.getCode()) {
+                case DIGIT1: case NUMPAD1: playerIndex = 0; break;
+                case DIGIT2: case NUMPAD2: playerIndex = 1; break;
+                case DIGIT3: case NUMPAD3: playerIndex = 2; break;
+                case DIGIT4: case NUMPAD4: playerIndex = 3; break;
+                case DIGIT0: case NUMPAD0: case ESCAPE:
+                    bindPlayerToUI.run();
+                    event.consume();
+                    return;
+                default:
+                    return;
+            }
+            List<Player> allPlayers = gameManager.getPlayers();
+            if (playerIndex >= 0 && playerIndex < allPlayers.size()) {
+                Player selectedPlayer = allPlayers.get(playerIndex);
+
+                handView.update(selectedPlayer);
+                playerNameLabel.setText(selectedPlayer.getName());
+
+                String colorName = selectedPlayer.getColor().toLowerCase();
+                String imagePath = "/assets/settlement/" + colorName + "set.png";
+                try {
+                    Image iconImg = new Image(getClass().getResource(imagePath).toExternalForm());
+                    playerIconView.setImage(iconImg);
+                } catch (Exception e) {
+                    System.out.println("Cade a imagem do settlement??? " + imagePath);
+                }
+                event.consume();
+            }
+        });
+
+
         primaryStage.setScene(scene);
 
         javafx.animation.AnimationTimer fpsTimer = new javafx.animation.AnimationTimer() {
