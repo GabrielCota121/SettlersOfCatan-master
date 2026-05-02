@@ -1,7 +1,5 @@
 package com.catan.model.state;
 
-import com.catan.model.cards.IDevelopmentCard;
-import com.catan.model.cards.VictoryPointCard;
 import com.catan.model.game.CatanGameManager;
 import com.catan.model.game.Turn;
 import com.catan.model.board.Edge;
@@ -36,7 +34,7 @@ public class WaitingRollState implements ITurnState {
 
             if (playersToDiscard.isEmpty()) {
                 manager.getLogger().log("Ninguém tem mais de 7 cartas!. Clique em um tile para mover o Ladrão!");
-                currentTurn.setState(new MoveRobberState(new MainState()));
+                currentTurn.setState(new MoveRobberState());
             } else {
                 manager.getLogger().log("Alguns jogadores precisam descartar cartas!");
                 currentTurn.setState(new WaitingDiscardState(playersToDiscard));
@@ -47,7 +45,6 @@ public class WaitingRollState implements ITurnState {
         }
         return true;
     }
-
 
     @Override
     public boolean buildSettlement(Vertex vertex, Turn currentTurn) { return false; }
@@ -71,23 +68,4 @@ public class WaitingRollState implements ITurnState {
 
     @Override
     public boolean canRollDice() { return true; }
-
-    public boolean playDevelopmentCard(IDevelopmentCard card, Turn currentTurn) {
-
-        if (currentTurn.hasPlayedDevCardThisTurn() && !(card instanceof VictoryPointCard)) {
-            currentTurn.getGameManager().getLogger().log("Só pode usar uma Development Card por turno, zé!!!");
-            return false;
-        }
-
-        boolean success = card.play(currentTurn.getGameManager(), currentTurn.getCurrentPlayer());
-
-        if (success) {
-
-            if (!(card instanceof VictoryPointCard)) {
-                currentTurn.markDevCardAsPlayed();
-            }
-            currentTurn.getCurrentPlayer().removeCard(card);
-        }
-        return success;
-    }
 }

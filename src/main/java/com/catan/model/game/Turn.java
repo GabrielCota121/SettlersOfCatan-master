@@ -7,7 +7,6 @@ public class Turn {
     private Player currentPlayer;
     private ITurnState currentState;
     private final CatanGameManager gameManager;
-    private boolean hasPlayedDevCard= false;
 
     public Turn(Player player, CatanGameManager gameManager) {
         this.currentPlayer = player;
@@ -29,12 +28,4 @@ public class Turn {
     }
 
     public CatanGameManager getGameManager() { return gameManager; }
-
-    public boolean hasPlayedDevCardThisTurn() {
-        return hasPlayedDevCard;
-    }
-
-    public void markDevCardAsPlayed() {
-        this.hasPlayedDevCard = true;
-    }
 }

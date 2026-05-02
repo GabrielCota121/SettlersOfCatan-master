@@ -1,6 +1,5 @@
 package com.catan.model.state;
 
-import com.catan.model.cards.IDevelopmentCard;
 import com.catan.model.game.Bank;
 import com.catan.model.logging.IGameLogger;
 import com.catan.model.game.ResourceType;
@@ -37,8 +36,6 @@ public class SetupState implements ITurnState {
             currentTurn.getGameManager().applyPortBonus(activePlayer, vertex.getPort());
         }
         settlementPlaced = true;
-        activePlayer.incrementSettlements();
-        activePlayer.incrementVictoryPoints();
         IGameLogger logger = currentTurn.getGameManager().getLogger();
         logger.log(activePlayer.getName() + " construiu um Settlement!");
 
@@ -88,7 +85,6 @@ public class SetupState implements ITurnState {
         }
         edge.setBuilding(new Road(activePlayer, edge));
         roadPlaced = true;
-        activePlayer.incrementRoads();
         currentTurn.getGameManager().proceedTurn();
         return true;
     }
@@ -118,7 +114,4 @@ public class SetupState implements ITurnState {
 
     @Override
     public boolean canRollDice() { return false; }
-
-    @Override public boolean playDevelopmentCard(IDevelopmentCard card, Turn currentTurn) {return false;}
-
 }
