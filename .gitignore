@@ -5,6 +5,7 @@ target/
 .kotlin
 
 ### IntelliJ IDEA ###
+.idea/*.xml
 .idea
 .idea/*
 .idea/modules.xml
