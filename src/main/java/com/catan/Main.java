@@ -457,13 +457,12 @@ public class Main extends Application {
                     if (victims.isEmpty()) {
                         robberState.executeSteal(null, gameManager.getCurrentTurn());
                         updateActionUI.run();
-
                     } else if (victims.size() == 1) {
                         robberState.executeSteal(victims.get(0), gameManager.getCurrentTurn());
                         updateActionUI.run();
-
                     } else {
                         buildStealVictimSidebar(victims, robberState, updateActionUI);
+                        buildPlayerOverviewSidebar();
                     }
                 }
                 render(gc, board, true);
