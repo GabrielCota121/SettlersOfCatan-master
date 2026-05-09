@@ -71,7 +71,8 @@ public class PlayerTradeState implements ITurnState {
 
     public void executeTrade(Player chosenPartner, Turn currentTurn) {
         if (!waitingForProposerToChoose || !offer.getAcceptedBy().contains(chosenPartner)) return;
-
+        // JÁ VOLTA PRA MAINSTATE PRA ATUALIZAR A UI CORRETAMENTE!
+        currentTurn.setState(new MainState());
         Player proposer = offer.getProposer();
 
         proposer.getWallet().payCost(offer.getOfferedResources());
@@ -94,8 +95,6 @@ public class PlayerTradeState implements ITurnState {
         currentTurn.getGameManager().getLogger().log("Troca concluída! " +
                 proposer.getName() + " deu [" + offeredStr + "] para " + chosenPartner.getName() +
                 " em troca de [" + requestedStr + "].");
-
-        currentTurn.setState(new MainState());
     }
 
     private String formatResourceMap(Map<ResourceType, Integer> map) {
