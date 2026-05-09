@@ -10,6 +10,7 @@ public class VictoryPointCard implements IDevelopmentCard {
     @Override
     public boolean play(CatanGameManager gameManager, Player player) {
         player.incrementVictoryPoints();
+        gameManager.getLogger().log(player.getName() + " usou uma carta de Victory Point e recebe 1 ponto!");
         return true;
     }
 

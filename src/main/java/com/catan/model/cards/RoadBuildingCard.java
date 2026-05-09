@@ -18,5 +18,5 @@ public class RoadBuildingCard implements IDevelopmentCard {
     }
 
     @Override
-    public void onPurchase(Player player) { player.addNewCard(this); }
+    public void onPurchase(Player player) {player.addNewCard(this);}
 }

@@ -40,7 +40,6 @@ public class MoveRobberState implements ITurnState {
 
         List<Player> victims = new ArrayList<>();
         Player currentPlayer = currentTurn.getCurrentPlayer();
-
         for (Vertex v : newTile.getVertices()) {
             if (!v.isEmpty()) {
                 Player owner = v.getBuilding().getOwner();

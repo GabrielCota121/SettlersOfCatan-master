@@ -3,19 +3,40 @@ package com.catan.model.board;
 import com.catan.model.game.ResourceType;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 public class Board {
     private final List<Tile> tiles;
-    private final Map<String, Vertex> vertexRegistry;
-    private final Map<String, Edge> edgeRegistry;
+    private final List<Vertex> vertices;
+    private final List<Edge> edges;
 
     public Board() {
         this.tiles = new ArrayList<>();
-        this.vertexRegistry = new HashMap<>();
-        this.edgeRegistry = new HashMap<>();
+        this.vertices = new ArrayList<>();
+        this.edges = new ArrayList<>();
+    }
+
+    private Vertex getOrCreateVertex(double x, double y) {
+        for (Vertex v : vertices) {
+            if (Math.hypot(v.getX() - x, v.getY() - y) < 5.0) {
+                return v;
+            }
+        }
+        Vertex newVertex = new Vertex(x, y);
+        vertices.add(newVertex);
+        return newVertex;
+    }
+
+    private Edge getOrCreateEdge(Vertex v1, Vertex v2) {
+        for (Edge e : edges) {
+            if ((e.getV1().equals(v1) && e.getV2().equals(v2)) ||
+                    (e.getV1().equals(v2) && e.getV2().equals(v1))) {
+                return e;
+            }
+        }
+        Edge newEdge = new Edge(v1, v2);
+        edges.add(newEdge);
+        return newEdge;
     }
 
     protected void createTile(int id, ResourceType resource, int numberToken, double centerX, double centerY, double hexSize) {
@@ -29,13 +50,7 @@ public class Board {
             double vx = centerX + hexSize * Math.cos(angle_rad);
             double vy = centerY + hexSize * Math.sin(angle_rad);
 
-            Vertex tempVertex = new Vertex(vx, vy);
-            String vId = tempVertex.getId();
-
-            if (!vertexRegistry.containsKey(vId)) {
-                vertexRegistry.put(vId, tempVertex);
-            }
-            hexVertices[i] = vertexRegistry.get(vId);
+            hexVertices[i] = getOrCreateVertex(vx, vy);
             hexVertices[i].addAdjacentTile(tile);
         }
 
@@ -43,18 +58,13 @@ public class Board {
             Vertex v1 = hexVertices[i];
             Vertex v2 = hexVertices[(i + 1) % 6];
 
-            Edge tempEdge = new Edge(v1, v2);
-            String eId = tempEdge.toString();
+            Edge edge = getOrCreateEdge(v1, v2);
+            hexEdges[i] = edge;
 
-            if (!edgeRegistry.containsKey(eId)) {
-                edgeRegistry.put(eId, tempEdge);
-
-                v1.addAdjacentVertex(v2);
-                v2.addAdjacentVertex(v1);
-                v1.addAdjacentEdge(tempEdge);
-                v2.addAdjacentEdge(tempEdge);
-            }
-            hexEdges[i] = edgeRegistry.get(eId);
+            v1.addAdjacentVertex(v2);
+            v2.addAdjacentVertex(v1);
+            v1.addAdjacentEdge(edge);
+            v2.addAdjacentEdge(edge);
         }
 
         tile.setVertices(hexVertices);
@@ -63,6 +73,6 @@ public class Board {
     }
 
     public List<Tile> getTiles() { return tiles; }
-    public List<Vertex> getVertices() { return new ArrayList<>(vertexRegistry.values()); }
-    public List<Edge> getEdges() { return new ArrayList<>(edgeRegistry.values()); }
+    public List<Vertex> getVertices() { return vertices; }
+    public List<Edge> getEdges() { return edges; }
 }
