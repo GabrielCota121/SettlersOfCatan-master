@@ -27,6 +27,7 @@ public class MonopolyState implements ITurnState {
 
     public void chooseResource(ResourceType chosenType, Turn currentTurn) {
         CatanGameManager gameManager = currentTurn.getGameManager();
+        currentTurn.setState(previousState);
         int totalStolen = 0;
         for (Player target : gameManager.getPlayers()) {
             if (target.equals(player)) continue;
@@ -48,7 +49,6 @@ public class MonopolyState implements ITurnState {
         } else {
             gameManager.getLogger().log("Que azar! Ninguém tinha " + chosenType.name() + " para o " + player.getName() + " roubar.");
         }
-        currentTurn.setState(previousState);
     }
 
     @Override public boolean buildSettlement(Vertex vertex, Turn currentTurn) { return false; }

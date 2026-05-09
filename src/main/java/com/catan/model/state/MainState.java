@@ -20,8 +20,10 @@ public class MainState implements ITurnState {
     @Override
     public boolean buildSettlement(Vertex vertex, Turn currentTurn) {
         Player activePlayer = currentTurn.getCurrentPlayer();
+        CatanGameManager gameManager = currentTurn.getGameManager();
+
         if(activePlayer.getNumSettlements() == 5){
-            currentTurn.getGameManager().getLogger().log(activePlayer.getName() + " já tem 5 settlements construidos!!");
+            gameManager.getLogger().log(activePlayer.getName() + " já tem 5 settlements construidos!!");
             return false;
         }
         Bank bank = currentTurn.getGameManager().getBank();
@@ -31,6 +33,7 @@ public class MainState implements ITurnState {
         if (activePlayer.getWallet().payCost(BuildingCost.SETTLEMENT.getCost())) {
             bank.receiveResources(BuildingCost.SETTLEMENT.getCost());
             vertex.setBuilding(new Settlement(activePlayer, vertex));
+            gameManager.getLogger().log(activePlayer.getName() + " construiu um settlement!!");
 
             if (vertex.hasPort()) {
                 currentTurn.getGameManager().applyPortBonus(activePlayer, vertex.getPort());
@@ -40,8 +43,7 @@ public class MainState implements ITurnState {
 
             // CASO haja quebra de estrada, devemos calcular novamente quem detem a maior estrada!
             // Escolhi botar pra sempre fazer isto por corretude! (é rápido, eu juro)
-            CatanGameManager gm = currentTurn.getGameManager();
-            gm.getRoadBonus().reevaluateAllPlayers(gm.getPlayers(), gm.getBoard().getEdges());
+            gameManager.getRoadBonus().reevaluateAllPlayers(gameManager.getPlayers(), gameManager.getBoard().getEdges());
             checkWinCondition(currentTurn);
             return true;
         }
@@ -70,6 +72,7 @@ public class MainState implements ITurnState {
             activePlayer.decrementSettlements();
             activePlayer.incrementCities();
             activePlayer.incrementVictoryPoints();
+            currentTurn.getGameManager().getLogger().log(activePlayer.getName() + " construiu uma city!!");
             checkWinCondition(currentTurn);
             return true;
         }
@@ -78,6 +81,7 @@ public class MainState implements ITurnState {
 
     @Override
     public boolean buildRoad(Edge edge, Turn currentTurn) {
+        CatanGameManager gameManager = currentTurn.getGameManager();
         if (!edge.isEmpty()) return false;
 
         Player activePlayer = currentTurn.getCurrentPlayer();
@@ -98,6 +102,7 @@ public class MainState implements ITurnState {
             bank.receiveResources(BuildingCost.ROAD.getCost());
             edge.setBuilding(new Road(activePlayer, edge));
             activePlayer.incrementRoads();
+            gameManager.getLogger().log(activePlayer.getName() + " construiu uma road!!");
             currentTurn.getGameManager().getRoadBonus().updateLongestRoad(activePlayer, currentTurn.getGameManager().getBoard().getEdges());
             checkWinCondition(currentTurn);
             return true;
