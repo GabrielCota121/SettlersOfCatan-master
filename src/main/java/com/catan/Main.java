@@ -1,6 +1,7 @@
 package com.catan;
 
 import com.catan.model.board.*;
+import com.catan.model.building.BuildingCost;
 import com.catan.model.building.Settlement;
 import com.catan.model.cards.IDevelopmentCard;
 import com.catan.model.game.CatanGameManager;
@@ -8,6 +9,7 @@ import com.catan.model.game.ResourceType;
 import com.catan.model.game.Turn;
 import com.catan.model.logging.ConsoleLogger;
 import com.catan.model.logging.IGameLogger;
+import com.catan.model.logging.WebSocketLogger;
 import com.catan.model.player.Player;
 import com.catan.model.state.ITurnState;
 import com.catan.model.state.MoveRobberState;
@@ -33,6 +35,8 @@ import javafx.scene.control.Label;
 import javafx.scene.image.ImageView;
 import javafx.scene.control.Spinner;
 import javafx.scene.control.Button;
+import javafx.scene.control.TextArea;
+import javafx.application.Platform;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -41,16 +45,12 @@ import java.util.Map;
 
 public class Main extends Application {
 
-    private static final int WIDTH = 1200;
+    private static final int WIDTH = 1600;
     private static final int HEIGHT = 900;
 
-    // Controlar FPS
     private long lastRenderTime = 0;
     private final long MIN_FRAME_TIME_NS = 1_000_000_000 / 120;
     private int framesThisSecond = 0;
-
-    private static final Color EDGE_COLOR = Color.rgb(44, 62, 80, 0.55);
-
     private CatanGameManager gameManager;
 
     private final Map<ResourceType, Image> tileImages = new HashMap<>();
@@ -66,6 +66,7 @@ public class Main extends Application {
     private Image robberImage;
 
     private VBox rightSidebar;
+    private VBox bankSidebarBox;
 
     private double zoomLevel = 0.18;
     private double offsetX = 60;
@@ -82,19 +83,36 @@ public class Main extends Application {
 
     public void start(Stage primaryStage) {
         loadAssets();
+        Runnable[] updateActionUIRef = new Runnable[1];
 
         Board board = BoardFactory.createStandardBoard();
         List<Player> players = new ArrayList<>();
-        players.add(new Player(1, "Lucas", "GREEN"));
-        players.add(new Player(2, "Gabriel", "BLUE"));
-        players.add(new Player(3, "Juliana", "YELLOW"));
-        players.add(new Player(4, "Marcelle", "RED"));
+        players.add(new Player(1, "Cauã", "RED"));
+        players.add(new Player(2, "Marcelle", "PURPLE"));
+        players.add(new Player(3, "Gabriel", "BLACK"));
+        players.add(new Player(4, "Lucas", "GREEN"));
 
-        IGameLogger logger = new ConsoleLogger();
+
+        TextArea logArea = new TextArea();
+        logArea.setEditable(false);
+        logArea.setWrapText(true);
+        logArea.setStyle("-fx-control-inner-background: #2c3e50; -fx-text-fill: #ecf0f1; -fx-font-family: 'Consolas'; -fx-font-size: 14px;");
+        logArea.setPrefWidth(350);
+
+        IGameLogger logger = new WebSocketLogger() {
+            @Override
+            public void log(String message) {
+                Platform.runLater(() -> {
+                    logArea.appendText("🎲 " + message + "\n");
+                });
+            }
+        };
+
         gameManager = new CatanGameManager(board, players, logger);
         gameManager.getCurrentTurn().setState(new SetupState(false));
+        logger.log("Bem-vindo à Ilha de Catan! GLGL!");
         logger.log("Fase atual: " + gameManager.getCurrentTurn().getState().getName());
-        logger.log("Vez de " + gameManager.getCurrentTurn().getCurrentPlayer().getName());
+        logger.log(gameManager.getCurrentTurn().getCurrentPlayer().getName() + " começa!");
 
         Canvas canvas = new Canvas(WIDTH, HEIGHT);
         GraphicsContext gc = canvas.getGraphicsContext2D();
@@ -146,6 +164,9 @@ public class Main extends Application {
         for (Player p : players) {
             p.getWallet().setOnWalletChangedListener(() -> {
                 handView.update(gameManager.getCurrentTurn().getCurrentPlayer());
+                if (updateActionUIRef[0] != null) {
+                    updateActionUIRef[0].run();
+                }
             });
         }
 
@@ -154,7 +175,7 @@ public class Main extends Application {
         VBox bankInfoBox = new VBox(5);
         bankInfoBox.setAlignment(javafx.geometry.Pos.CENTER);
 
-        Label bankNameLabel = new Label("BANCO");
+        Label bankNameLabel = new Label("Banco");
         bankNameLabel.setStyle("-fx-font-size: 20px; -fx-font-weight: bold; -fx-text-fill: #ecf0f1;");
 
         ImageView bankIconView = new ImageView();
@@ -176,6 +197,14 @@ public class Main extends Application {
 
         bankHandView.update(gameManager.getBank().getWallet());
 
+        bankHandView.setScaleX(0.7);
+        bankHandView.setScaleY(0.7);
+        javafx.scene.Group bankHandGroup = new javafx.scene.Group(bankHandView);
+
+        bankSidebarBox = new VBox(10, bankInfoBox, bankHandGroup);
+        bankSidebarBox.setAlignment(javafx.geometry.Pos.CENTER);
+        bankSidebarBox.setStyle("-fx-background-color: #2c3e50; -fx-padding: 10; -fx-background-radius: 8;");
+
         javafx.scene.layout.Region spacer = new javafx.scene.layout.Region();
         HBox.setHgrow(spacer, javafx.scene.layout.Priority.ALWAYS);
 
@@ -194,12 +223,14 @@ public class Main extends Application {
         Image passTurnImg = null;
         Image cantPassTurnImg = null;
         Image tradeImg = null;
+        Image bgButtonImg = null;
         Image[] diceImgs = new Image[7];
 
         try {
             passTurnImg = new Image(getClass().getResourceAsStream("/assets/passturn/passturn.png"));
             cantPassTurnImg = new Image(getClass().getResourceAsStream("/assets/passturn/cantpassturn.png"));
             tradeImg = new Image(getClass().getResourceAsStream("/assets/trade/tradeicon.png"));
+            bgButtonImg = new Image(getClass().getResourceAsStream("/assets/background/bgbutton.png"));
             for (int i = 1; i <= 6; i++) {
                 String path = "/assets/dice/"+i;
                 var stream = getClass().getResourceAsStream(path);
@@ -210,7 +241,7 @@ public class Main extends Application {
                 }
             }
         } catch (Exception e) {
-            System.out.println("Deu ruim ao carregar botões/dados: " + e.getMessage());
+            System.out.println("Deu ruim ao carregar botões/dados/bg: " + e.getMessage());
         }
 
         ImageView passTurnView = new ImageView(cantPassTurnImg);
@@ -230,14 +261,24 @@ public class Main extends Application {
         ImageView tradeIconView = new ImageView(tradeImg);
         tradeIconView.setFitHeight(50);
         tradeIconView.setPreserveRatio(true);
-        tradeIconView.setCursor(javafx.scene.Cursor.HAND);
+
+        ImageView tradeBgView = new ImageView(bgButtonImg);
+        tradeBgView.setFitHeight(70);
+        tradeBgView.setPreserveRatio(true);
+
+        StackPane tradeButtonPane = new StackPane(tradeBgView, tradeIconView);
 
         ImageView buyDevCardView = new ImageView(devCardDeckImage);
         buyDevCardView.setFitHeight(60);
         buyDevCardView.setPreserveRatio(true);
-        buyDevCardView.setCursor(javafx.scene.Cursor.HAND);
 
-        HBox diceAndTradeBox = new HBox(15, buyDevCardView, tradeIconView, diceBox);
+        ImageView devCardBgView = new ImageView(bgButtonImg);
+        devCardBgView.setFitHeight(70);
+        devCardBgView.setPreserveRatio(true);
+
+        StackPane devCardButtonPane = new StackPane(devCardBgView, buyDevCardView);
+
+        HBox diceAndTradeBox = new HBox(15, devCardButtonPane, tradeButtonPane, diceBox);
         diceAndTradeBox.setAlignment(javafx.geometry.Pos.CENTER);
 
         VBox turnControlsBox = new VBox(15, diceAndTradeBox, passTurnView);
@@ -246,8 +287,6 @@ public class Main extends Application {
         Image finalPassTurnImg = passTurnImg;
         Image finalCantPassTurnImg = cantPassTurnImg;
 
-
-        Runnable[] updateActionUIRef = new Runnable[1];
 
         Runnable updateDevCardsUI = () -> {
             devCardsBox.getChildren().clear();
@@ -309,6 +348,7 @@ public class Main extends Application {
 
         Runnable updateActionUI = () -> {
             ITurnState state = gameManager.getCurrentTurn().getState();
+            Player currentPlayer = gameManager.getCurrentTurn().getCurrentPlayer();
 
             passTurnView.setImage(state.canEndTurn() ? finalPassTurnImg : finalCantPassTurnImg);
             passTurnView.setCursor(state.canEndTurn() ? javafx.scene.Cursor.HAND : javafx.scene.Cursor.DEFAULT);
@@ -317,11 +357,12 @@ public class Main extends Application {
             diceBox.setOpacity(state.canRollDice() ? 1.0 : 0.3);
 
             boolean isMainState = state instanceof com.catan.model.state.MainState;
-            tradeIconView.setOpacity(isMainState ? 1.0 : 0.3);
-            tradeIconView.setCursor(isMainState ? javafx.scene.Cursor.HAND : javafx.scene.Cursor.DEFAULT);
 
-            buyDevCardView.setOpacity(isMainState ? 1.0 : 0.3);
-            buyDevCardView.setCursor(isMainState ? javafx.scene.Cursor.HAND : javafx.scene.Cursor.DEFAULT);
+            tradeButtonPane.setOpacity(isMainState? 1.0 : 0.3);
+            tradeButtonPane.setCursor(isMainState ? javafx.scene.Cursor.HAND : javafx.scene.Cursor.DEFAULT);
+
+            devCardButtonPane.setOpacity((isMainState && currentPlayer.canAfford(BuildingCost.DEVELOPMENT_CARD)) ? 1.0 : 0.3);
+            devCardButtonPane.setCursor(isMainState ? javafx.scene.Cursor.HAND : javafx.scene.Cursor.DEFAULT);
 
             int d1 = gameManager.getDice1().getResult();
             int d2 = gameManager.getDice2().getResult();
@@ -371,7 +412,7 @@ public class Main extends Application {
             updateActionUI.run();
         });
 
-        tradeIconView.setOnMouseClicked(e -> {
+        tradeButtonPane.setOnMouseClicked(e -> {
             ITurnState currentState = gameManager.getCurrentTurn().getState();
             if (!(currentState instanceof com.catan.model.state.MainState)) {
                 gameManager.getLogger().log("Você só pode propor trocas na MainState!");
@@ -381,7 +422,7 @@ public class Main extends Application {
             buildTradeOptionsSidebar();
         });
 
-        buyDevCardView.setOnMouseClicked(e -> {
+        devCardButtonPane.setOnMouseClicked(e -> {
             ITurnState currentState = gameManager.getCurrentTurn().getState();
             if (currentState instanceof com.catan.model.state.MainState) {
                 boolean success = currentState.buyDevelopmentCard(gameManager.getCurrentTurn());
@@ -390,7 +431,7 @@ public class Main extends Application {
                 }
                 updateActionUI.run();
             } else {
-                gameManager.getLogger().log("Você só pode comprar cartas na sua Main State!");
+                gameManager.getLogger().log("Você só pode comprar devcard na sua Main State!");
             }
         });
 
@@ -416,13 +457,12 @@ public class Main extends Application {
                     if (victims.isEmpty()) {
                         robberState.executeSteal(null, gameManager.getCurrentTurn());
                         updateActionUI.run();
-
                     } else if (victims.size() == 1) {
                         robberState.executeSteal(victims.get(0), gameManager.getCurrentTurn());
                         updateActionUI.run();
-
                     } else {
                         buildStealVictimSidebar(victims, robberState, updateActionUI);
+                        buildPlayerOverviewSidebar();
                     }
                 }
                 render(gc, board, true);
@@ -456,9 +496,26 @@ public class Main extends Application {
 
         rightSidebar = new VBox(15);
         rightSidebar.setPrefWidth(350);
+        rightSidebar.setMinWidth(350);
+        rightSidebar.setMaxWidth(350);
         rightSidebar.setStyle("-fx-background-color: #34495e; -fx-padding: 20;");
         rightSidebar.setAlignment(javafx.geometry.Pos.TOP_CENTER);
-        root.setRight(rightSidebar);
+
+        javafx.scene.control.ScrollPane rightScroll = new javafx.scene.control.ScrollPane(rightSidebar);
+        rightScroll.setFitToWidth(true);
+        rightScroll.setHbarPolicy(javafx.scene.control.ScrollPane.ScrollBarPolicy.NEVER);
+        rightScroll.setVbarPolicy(javafx.scene.control.ScrollPane.ScrollBarPolicy.AS_NEEDED);
+        rightScroll.setStyle("-fx-background: #34495e; -fx-background-color: #34495e; -fx-border-color: #34495e;");
+
+        root.setRight(rightScroll);
+
+        VBox leftSidebar = new VBox(10);
+        leftSidebar.setStyle("-fx-background-color: #34495e; -fx-padding: 10;");
+        Label logTitle = new Label("Histórico");
+        logTitle.setStyle("-fx-text-fill: white; -fx-font-size: 18px; -fx-font-weight: bold;");
+        leftSidebar.getChildren().addAll(logTitle, logArea);
+        javafx.scene.layout.VBox.setVgrow(logArea, javafx.scene.layout.Priority.ALWAYS);
+        root.setLeft(leftSidebar);
 
         bindPlayerToUI.run();
         gameManager.setOnTurnChangedListener(bindPlayerToUI);
@@ -468,8 +525,6 @@ public class Main extends Application {
                 handView,
                 devCardsBox,
                 spacer,
-                bankInfoBox,
-                bankHandView,
                 turnControlsBox
         );
         bottomMenu.setPrefHeight(200);
@@ -478,12 +533,44 @@ public class Main extends Application {
         HBox.setHgrow(spacer, javafx.scene.layout.Priority.ALWAYS);
 
         root.setBottom(bottomMenu);
-
-
-
         render(gc, board, true);
 
         Scene scene = new Scene(root, WIDTH, HEIGHT);
+        scene.addEventFilter(javafx.scene.input.KeyEvent.KEY_PRESSED, event -> {
+            int playerIndex = -1;
+
+            switch (event.getCode()) {
+                case DIGIT1: case NUMPAD1: playerIndex = 0; break;
+                case DIGIT2: case NUMPAD2: playerIndex = 1; break;
+                case DIGIT3: case NUMPAD3: playerIndex = 2; break;
+                case DIGIT4: case NUMPAD4: playerIndex = 3; break;
+                case DIGIT0: case NUMPAD0: case ESCAPE:
+                    bindPlayerToUI.run();
+                    event.consume();
+                    return;
+                default:
+                    return;
+            }
+            List<Player> allPlayers = gameManager.getPlayers();
+            if (playerIndex >= 0 && playerIndex < allPlayers.size()) {
+                Player selectedPlayer = allPlayers.get(playerIndex);
+
+                handView.update(selectedPlayer);
+                playerNameLabel.setText(selectedPlayer.getName());
+
+                String colorName = selectedPlayer.getColor().toLowerCase();
+                String imagePath = "/assets/settlement/" + colorName + "set.png";
+                try {
+                    Image iconImg = new Image(getClass().getResource(imagePath).toExternalForm());
+                    playerIconView.setImage(iconImg);
+                } catch (Exception e) {
+                    System.out.println("Cade a imagem do settlement??? " + imagePath);
+                }
+                event.consume();
+            }
+        });
+
+
         primaryStage.setScene(scene);
 
         javafx.animation.AnimationTimer fpsTimer = new javafx.animation.AnimationTimer() {
@@ -621,6 +708,7 @@ public class Main extends Application {
         btnCancel.setOnAction(e -> updateSidebar());
 
         rightSidebar.getChildren().addAll(titleLabel, btnBank, btnPlayers, btnCancel);
+        buildPlayerOverviewSidebar();
     }
 
     private void buildPlayerTradeCreationSidebar() {
@@ -699,6 +787,7 @@ public class Main extends Application {
         buttonsBox.setAlignment(javafx.geometry.Pos.CENTER);
 
         rightSidebar.getChildren().addAll(titleLabel, offerBox, requestBox, buttonsBox);
+        buildPlayerOverviewSidebar();
     }
 
     private void buildBankTradeSidebar() {
@@ -792,6 +881,7 @@ public class Main extends Application {
                 confirmBtn,
                 btnCancel
         );
+        buildPlayerOverviewSidebar();
     }
 
     private void render(GraphicsContext gc, Board board, boolean force) {
@@ -1115,6 +1205,9 @@ public class Main extends Application {
         separator.setStyle("-fx-padding: 10 0 5 0;");
         rightSidebar.getChildren().add(separator);
 
+        if (bankSidebarBox != null) {
+            rightSidebar.getChildren().add(bankSidebarBox);
+        }
 
         for (Player p : gameManager.getPlayers()) {
             HBox playerBox = new HBox(15);

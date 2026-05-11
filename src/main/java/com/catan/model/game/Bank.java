@@ -58,7 +58,7 @@ public class Bank {
                     }
                 }
             } else if (tile.getNumberToken() == roll && tile.equals(robber.getCurrentTile())) {
-                logger.log("O ladrão bloqueou a produção de " + tile.getResource() + "!");
+                logger.log("O robber bloqueou a produção de " + tile.getResource() + " por ter rolado " + roll + "!");
             }
         }
 
