@@ -2,6 +2,7 @@ package com.catan.network.Client;
 
 import com.catan.network.SocketConfig;
 import com.catan.network.Sockets;
+import com.catan.network.packets.PacketBuilder;
 
 import java.io.IOException;
 import java.net.*;
@@ -30,13 +31,19 @@ public class ScanForGames extends Thread {
                         for (InterfaceAddress interfaceAddress : interfaceAddresses) {
                             Inet4Address broadcast = (Inet4Address) interfaceAddress.getBroadcast();
                             if (broadcast != null) { // agora que já verifiquei tudo, posso criar um socket em broadcast
-                                Sockets.addNewBroadcastSocket((Inet4Address) ip, broadcast, SocketConfig.getUdpPort());
+                                Sockets.addNewBroadcastSocket(broadcast, SocketConfig.getUdpPort());
                             }
                         }
                     }
                 }
             }
             // passo 2: criados os sockets de broadcast, criar um server socket pra cada rede local e aguardar respostas do servidores
+            ServerSocket socket = new ServerSocket(SocketConfig.getUdpPort()); // cria um server socket em uma porta para esperar as respostas
+            for(DatagramSocket broadcast:Sockets.getAllBroadcastSockets()){
+                //TODO verificar o que significa o connected
+                System.out.println(broadcast.isConnected());
+                broadcast.send(PacketBuilder.buildSyn((Inet4Address) broadcast.getLocalAddress(), broadcast.getPort(), SocketConfig.getTcpPort(), SocketConfig.getUdpPort()));
+            }
         } catch (SocketException e) {
             throw new RuntimeException(e);
         } catch (IOException e) {
