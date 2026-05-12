@@ -38,10 +38,7 @@ import javafx.scene.control.Button;
 import javafx.scene.control.TextArea;
 import javafx.application.Platform;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public class Main extends Application {
 
@@ -91,12 +88,13 @@ public class Main extends Application {
         players.add(new Player(2, "Marcelle", "PURPLE"));
         players.add(new Player(3, "Gabriel", "BLACK"));
         players.add(new Player(4, "Lucas", "GREEN"));
+        Collections.shuffle(players);
 
 
         TextArea logArea = new TextArea();
         logArea.setEditable(false);
         logArea.setWrapText(true);
-        logArea.setStyle("-fx-control-inner-background: #2c3e50; -fx-text-fill: #ecf0f1; -fx-font-family: 'Consolas'; -fx-font-size: 14px;");
+        logArea.setStyle("-fx-control-inner-background: #2c3e50; -fx-text-fill: #ecf0f1; -fx-font-family: 'Consolas'; -fx-font-size: 14px; -fx-font-weight: bold;");
         logArea.setPrefWidth(350);
 
         IGameLogger logger = new WebSocketLogger() {
@@ -538,6 +536,7 @@ public class Main extends Application {
         Scene scene = new Scene(root, WIDTH, HEIGHT);
         scene.addEventFilter(javafx.scene.input.KeyEvent.KEY_PRESSED, event -> {
             int playerIndex = -1;
+            Player currentPlayer = gameManager.getCurrentTurn().getCurrentPlayer();
 
             switch (event.getCode()) {
                 case DIGIT1: case NUMPAD1: playerIndex = 0; break;
@@ -548,6 +547,27 @@ public class Main extends Application {
                     bindPlayerToUI.run();
                     event.consume();
                     return;
+                case Q:
+                    currentPlayer.getWallet().addResource(ResourceType.WOOD, 1);
+                    event.consume();
+                    return;
+                case W:
+                    currentPlayer.getWallet().addResource(ResourceType.BRICK, 1);
+                    event.consume();
+                    return;
+                case E:
+                    currentPlayer.getWallet().addResource(ResourceType.WOOL, 1);
+                    event.consume();
+                    return;
+                case R:
+                    currentPlayer.getWallet().addResource(ResourceType.WHEAT, 1);
+                    event.consume();
+                    return;
+                case T:
+                    currentPlayer.getWallet().addResource(ResourceType.ORE, 1);
+                    event.consume();
+                    return;
+
                 default:
                     return;
             }
