@@ -9,7 +9,7 @@ import java.net.*;
 import java.util.Enumeration;
 import java.util.List;
 
-import static com.catan.network.util.netFunctions.isIpV4Address;
+import static com.catan.network.util.NetFunctions.isIpV4Address;
 
 public class ScanForGames extends Thread {
     
@@ -38,6 +38,7 @@ public class ScanForGames extends Thread {
                 }
             }
             // passo 2: criados os sockets de broadcast, criar um server socket pra cada rede local e aguardar respostas do servidores
+            //todo server socket não serve! ServerSocket é pra criar conexão e isso é UDP, que não é guiadpo por conexão. Preciso usar datagramSocket
             ServerSocket socket = new ServerSocket(SocketConfig.getUdpPort()); // cria um server socket em uma porta para esperar as respostas
             for(DatagramSocket broadcast:Sockets.getAllBroadcastSockets()){
                 //TODO verificar o que significa o connected

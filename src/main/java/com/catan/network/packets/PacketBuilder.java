@@ -17,9 +17,20 @@ public class PacketBuilder {
         byte[] messageBytes = message.getBytes();
         return new DatagramPacket(messageBytes, messageBytes.length, broadcast, port);
     }
-    public static DatagramPacket buildSynAck(Inet4Address ipCliente, int portaCliente, int portaServer){
-        // todo construir o synack aqui
-        return null;
+
+    /**
+     *
+     * @param ipCliente IP do cliente para o qual quero enviar uma resposta
+     * @param portaCliente Porta de destino do cliente. UDP. Vem na mensagem do pacote SYN
+     * @param portaTcpServer Porta TCP do server. Pode ser alterada. É a que vai ser usada para abrir um socket TCP no caso de uma conexão.
+     * @param nomeServer Nome do servidor.
+     * @param numeroJogadores Quantidade de jogadores humanos. Serve para saber se é possível entrar na partida.
+     * @return Um pacote SYNACK destinado a responder um cliente em específico. Deve ser transmitido em UDP.
+     */
+    public static DatagramPacket buildSynAck(Inet4Address ipCliente, int portaCliente, int portaTcpServer, String nomeServer, int numeroJogadores){
+        String message = Packets.getPacketName(Packets.SYNACK)+"\n"+portaTcpServer+"\n"+nomeServer+"\n"+numeroJogadores;
+        byte[] messageBytes = message.getBytes();
+        return new DatagramPacket(messageBytes, messageBytes.length, ipCliente, portaCliente);
     }
 
 }

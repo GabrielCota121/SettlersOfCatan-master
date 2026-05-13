@@ -11,7 +11,11 @@ import java.util.List;
 public class SocketConfig {
     private static int udpPort = 25565;
     private static int tcpPort = 25566;
+    private static final int serverUdpPort = 25567; // deve ser usada como porta udp para o servidor. Precisa ter um valor fixo pq é para onde vamos mandar a requisiçã inicial
 
+    public static int getServerUdpPort(){
+        return serverUdpPort;
+    }
 
     public static int getUdpPort() {
         return udpPort;

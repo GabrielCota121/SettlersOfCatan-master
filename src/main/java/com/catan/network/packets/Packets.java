@@ -6,7 +6,7 @@ public enum Packets {
         return switch (packet) {
             case SYN -> "SYN";
             case SYNACK -> "SYNACK";
-            case ERROR -> "Error";
+            case ERROR -> "ERROR";
         };
     }
 

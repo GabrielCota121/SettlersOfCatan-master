@@ -23,7 +23,9 @@ public class Sockets {
         return new Socket(ip, port);
     }
     private static DatagramSocket createUdpSocket(Inet4Address ip, int port, boolean broadcast) throws IOException {
-        return new DatagramSocket(port, ip);
+        DatagramSocket socket = new DatagramSocket(port, ip);
+        socket.setBroadcast(broadcast);
+        return socket;
     }
     public static void addNewBroadcastSocket(Inet4Address ipBroadcast, int port) throws IOException {
         broadcastUdpSockets.add(createUdpSocket(ipBroadcast, port, true)); // para eu poder recuperar um socket de broadcast dado meu ip na rede local
