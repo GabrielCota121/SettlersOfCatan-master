@@ -1,15 +1,14 @@
 package com.catan.network.server;
 
-import com.catan.network.SocketConfig;
-
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.SocketException;
+import java.nio.charset.StandardCharsets;
 
 public class SynListener extends Thread{
-    // todo todo o resto do código do servidor será feito em uma única thread. Vai ter uma pra conexão TCP e essa, pra receber e responder pacotes udp
-    DatagramSocket socket = new DatagramSocket(SocketConfig.getServerUdpPort());
+    // todo essa é a thread que responde a pacotes udp. O único pacote udp que o servidor recebe é syn
+    DatagramSocket socket = new DatagramSocket(ServerPorts.getServerUdpPort());
     private boolean stop = false;
 
     public SynListener() throws IOException {
@@ -22,13 +21,15 @@ public class SynListener extends Thread{
     // essa thread vai escutar por syns. É parte do servidor. escuta na porta udp 25567
     @Override
     public void run(){
+        System.out.println("SynListener started");
         byte[] buffer = new byte[1024]; // todo investigar qual o tamanho correto do buffer. Por enquanto, coloquei 1024
         while(!stop){
             try {
-                DatagramSocket recieveSocket = new DatagramSocket(SocketConfig.getServerUdpPort());
                 DatagramPacket recievedPacket = new DatagramPacket(buffer, buffer.length); // o buffer tem o tamanho de um pacote... E se mais de um cliente mandar um pacote de uma vez?
                 socket.receive(recievedPacket);
-                //String message =
+                String message = new String(recievedPacket.getData(), 0, recievedPacket.getLength(), StandardCharsets.ISO_8859_1);
+                //debug
+                System.out.println(message);
 
             } catch (SocketException e) {
                 // todo acertar exceptions depois

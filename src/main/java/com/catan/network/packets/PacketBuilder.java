@@ -1,5 +1,9 @@
 package com.catan.network.packets;
 
+import com.catan.GeneralConfig;
+import com.catan.network.util.NetFunctions;
+import com.catan.network.util.StringFunctions;
+
 import java.net.DatagramPacket;
 import java.net.Inet4Address;
 
@@ -13,10 +17,15 @@ public class PacketBuilder {
      * @return Um DatagramPacket SYN. Deve ser transmitido em broadcast.
      */
     public static DatagramPacket buildSyn(Inet4Address broadcast, int port, int clientTcpPort, int clientUdpPort){
-        String message = Packets.getPacketName(Packets.SYN)+"\n"+clientTcpPort+"\n"+clientUdpPort+"\n";
-        byte[] messageBytes = message.getBytes();
+        //ajustando tamanho das strings de porta pra que todos os pacotes tenham o mesmo tamanho
+        String clientTcpPortString = NetFunctions.adjustPortStringSize(String.valueOf(clientTcpPort));
+        String clientUdpPortString = NetFunctions.adjustPortStringSize(String.valueOf(clientUdpPort));
+        // iso 8859-1 porque o tamanho do caractere é fixo e suporta acentos
+        String message = Packets.getPacketName(Packets.SYN)+"\n"+clientTcpPortString+"\n"+clientUdpPortString+"\n";
+        byte[] messageBytes = StringFunctions.getStringBytesAsIso88591(message);
         return new DatagramPacket(messageBytes, messageBytes.length, broadcast, port);
     }
+
 
     /**
      *
@@ -28,8 +37,11 @@ public class PacketBuilder {
      * @return Um pacote SYNACK destinado a responder um cliente em específico. Deve ser transmitido em UDP.
      */
     public static DatagramPacket buildSynAck(Inet4Address ipCliente, int portaCliente, int portaTcpServer, String nomeServer, int numeroJogadores){
-        String message = Packets.getPacketName(Packets.SYNACK)+"\n"+portaTcpServer+"\n"+nomeServer+"\n"+numeroJogadores;
-        byte[] messageBytes = message.getBytes();
+        //ajustar os tamanhos das strings. numero de jogadores não precisa porque tem apenas 1 dígito
+        String portaTcpServerString = NetFunctions.adjustPortStringSize(String.valueOf(portaTcpServer));
+        String nomeServerAjustado = NetFunctions.adjustTextStringSize(String.valueOf(nomeServer), GeneralConfig.maxServerNameSize);
+        String message = Packets.getPacketName(Packets.SYNACK)+"\n"+portaTcpServerString+"\n"+nomeServerAjustado+"\n"+numeroJogadores;
+        byte[] messageBytes = StringFunctions.getStringBytesAsIso88591(message);
         return new DatagramPacket(messageBytes, messageBytes.length, ipCliente, portaCliente);
     }
 
