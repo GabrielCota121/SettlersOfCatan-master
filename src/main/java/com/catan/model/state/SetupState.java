@@ -52,7 +52,7 @@ public class SetupState implements ITurnState {
                     if (bank.getWallet().getResourceAmount(type) >= yield) {
                         bank.getWallet().removeResource(type, yield);
                         activePlayer.getWallet().addResource(type, yield);
-                        logger.log(activePlayer.getName() + " colocou seu segundo settlement e recebe " + yield + " " + type);
+                        logger.log(activePlayer.getName() + " recebe " + yield + " " + type);
                     }
                 }
             }
