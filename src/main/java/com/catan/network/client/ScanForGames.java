@@ -6,13 +6,14 @@ import com.catan.network.server.ServerPorts;
 
 import java.io.IOException;
 import java.net.*;
+import java.nio.charset.StandardCharsets;
 import java.util.Enumeration;
 import java.util.List;
 
 import static com.catan.network.util.NetFunctions.isIpV4Address;
 
 public class ScanForGames extends Thread {
-    
+
     public void scan(){
         start();
     }
@@ -39,12 +40,31 @@ public class ScanForGames extends Thread {
                 }
             }
             // passo 2: criados os sockets de broadcast, criar um server socket pra cada rede local e aguardar respostas do servidores
-            //todo server socket não serve! ServerSocket é pra criar conexão e isso é UDP, que não é guiado por conexão. Preciso usar datagramSocket
-            //ServerSocket socket = new ServerSocket(ClientPorts.getUdpPort()); // cria um server socket em uma porta para esperar as respostas
+            DatagramSocket socketUdpRecebimento = new DatagramSocket(ClientPorts.getUdpPort()); // preparo um socket para receber os synacks
+            socketUdpRecebimento.setSoTimeout(1000); // vou esperar apenas 1s antes de desistir e passar para a próxima rede
+            byte[] buffer = new byte[1024]; // o buffer que vou usar para receber os synacks. Posso receber uma pancada de uma única rede
             for(Inet4Address broadcastAddr:Sockets.getAllBroadcastAddresses()){
+                System.out.println("Cliente enviará um Syn para "+broadcastAddr.toString());
                 DatagramSocket socketBroad = new DatagramSocket(); // crio um socket de broadcast em qualquer porta aberta
                 socketBroad.setBroadcast(true);
-                socketBroad.send(PacketBuilder.buildSyn(broadcastAddr, ServerPorts.getServerUdpPort(), ClientPorts.getTcpPort(), ClientPorts.getUdpPort()));
+                socketBroad.send(PacketBuilder.buildSyn(broadcastAddr, ServerPorts.getServerUdpPort(), ClientPorts.getUdpPort()));
+                System.out.println("Enviado");
+                // enviado, aguardar respostas aqui.
+                // lança socketTimeoutException se o tempo expirar
+                boolean timedOut = false;
+                while(!timedOut){ // enquanto não der um timeout, significa que estou recebendo respostas
+                    try{
+                        System.out.println("Esperando respostas da rede "+broadcastAddr.toString());
+                        DatagramPacket recievedPacket = new DatagramPacket(buffer, buffer.length); // todo verificar tamanho do pacote pra ler somente o necessário do buffer
+                        socketUdpRecebimento.receive(recievedPacket);
+                        System.out.println("recebi uma resposta");
+                        String message = new String(recievedPacket.getData(), 0, recievedPacket.getLength(), StandardCharsets.ISO_8859_1);                        //debug
+                        System.out.println(message);
+                    }catch(SocketTimeoutException e){
+                        System.out.println("Deu timeout, sem respostas nessa rede por 1 segundo.");
+                        timedOut = true;
+                    }
+                }
             }
         } catch (SocketException e) {
             throw new RuntimeException(e);

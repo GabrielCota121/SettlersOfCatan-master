@@ -12,20 +12,18 @@ public class PacketBuilder {
      *
      * @param broadcast O endereço IP de broadcast da rede que vai receber o SYN
      * @param port A porta de destino dos servidores.
-     * @param clientTcpPort A porta TCP que o cliente usará para receber as respostas
      * @param clientUdpPort A porta UDP que o cliente usará para receber as respostas
      * @return Um DatagramPacket SYN. Deve ser transmitido em broadcast.
      */
-    public static DatagramPacket buildSyn(Inet4Address broadcast, int port, int clientTcpPort, int clientUdpPort){
+    public static DatagramPacket buildSyn(Inet4Address broadcast, int port, int clientUdpPort){
         //ajustando tamanho das strings de porta pra que todos os pacotes tenham o mesmo tamanho
-        String clientTcpPortString = NetFunctions.adjustPortStringSize(String.valueOf(clientTcpPort));
         String clientUdpPortString = NetFunctions.adjustPortStringSize(String.valueOf(clientUdpPort));
         // iso 8859-1 porque o tamanho do caractere é fixo e suporta acentos
-        String message = Packets.getPacketName(Packets.SYN)+"\n"+clientTcpPortString+"\n"+clientUdpPortString+"\n";
+        String message = Packets.getPacketName(Packets.SYN)+"\n"+clientUdpPortString+"\n";
         byte[] messageBytes = StringFunctions.getStringBytesAsIso88591(message);
         return new DatagramPacket(messageBytes, messageBytes.length, broadcast, port);
     }
-
+    // todo colocar a porta tcp que o cliente vai usar pra receber no connect em vez do syn
 
     /**
      *

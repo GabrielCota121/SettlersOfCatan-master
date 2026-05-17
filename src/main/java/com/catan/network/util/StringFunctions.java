@@ -6,4 +6,7 @@ public class StringFunctions {
     public static byte[] getStringBytesAsIso88591(String string){
         return string.getBytes(StandardCharsets.ISO_8859_1);
     }
+    public static String[] getMessageLines(String message){
+        return message.split("\n");
+    }
 }

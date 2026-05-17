@@ -10,8 +10,10 @@ import java.net.Inet4Address;
 import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
 
+import static java.lang.Thread.sleep;
+
 public class NetworkTests {
-    public static void main(String[] args) throws IOException {
+    public static void main(String[] args) throws IOException, InterruptedException {
         // verificando se o tamanho do caractere é fixo
         System.out.println("Tamanho de alberto (bytes) em String: "+"alberto".getBytes(StandardCharsets.ISO_8859_1).length);
         System.out.println("Tamanho de alberto (bytes) em String: "+"álbertô".getBytes(StandardCharsets.ISO_8859_1).length);
@@ -23,5 +25,7 @@ public class NetworkTests {
         // iniciando o scan de partidas
         ScanForGames scan = new ScanForGames();
         scan.scan();
+        sleep(100);
+        listener.setStop(true);
     }
 }
