@@ -1,12 +1,14 @@
 package com.catan.network.client;
 
-import com.catan.network.Sockets;
 import com.catan.network.packets.PacketBuilder;
 import com.catan.network.server.ServerPorts;
+import com.catan.network.util.NetFunctions;
+import com.catan.network.util.StringFunctions;
 
 import java.io.IOException;
 import java.net.*;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.List;
 
@@ -19,6 +21,7 @@ public class ScanForGames extends Thread {
     }
     @Override
     public void run() {
+        ArrayList<Inet4Address> broadcastAddresses = new ArrayList<>();
         System.out.println("Scan thread started");
        // passo 1: verificar as redes nas quais estou conectado e criar um socket de broadscast para cada uma delas
         try {
@@ -33,7 +36,7 @@ public class ScanForGames extends Thread {
                         for (InterfaceAddress interfaceAddress : interfaceAddresses) {
                             Inet4Address broadcast = (Inet4Address) interfaceAddress.getBroadcast();
                             if (broadcast != null) { // agora que já verifiquei tudo, posso adicionar à lista de endereços de broadcast
-                                Sockets.addNewBroadcastAddress(broadcast);
+                                broadcastAddresses.add(broadcast);
                             }
                         }
                     }
@@ -43,7 +46,7 @@ public class ScanForGames extends Thread {
             DatagramSocket socketUdpRecebimento = new DatagramSocket(ClientPorts.getUdpPort()); // preparo um socket para receber os synacks
             socketUdpRecebimento.setSoTimeout(1000); // vou esperar apenas 1s antes de desistir e passar para a próxima rede
             byte[] buffer = new byte[1024]; // o buffer que vou usar para receber os synacks. Posso receber uma pancada de uma única rede
-            for(Inet4Address broadcastAddr:Sockets.getAllBroadcastAddresses()){
+            for(Inet4Address broadcastAddr:broadcastAddresses){
                 System.out.println("Cliente enviará um Syn para "+broadcastAddr.toString());
                 DatagramSocket socketBroad = new DatagramSocket(); // crio um socket de broadcast em qualquer porta aberta
                 socketBroad.setBroadcast(true);
@@ -58,8 +61,13 @@ public class ScanForGames extends Thread {
                         DatagramPacket recievedPacket = new DatagramPacket(buffer, buffer.length); // todo verificar tamanho do pacote pra ler somente o necessário do buffer
                         socketUdpRecebimento.receive(recievedPacket);
                         System.out.println("recebi uma resposta");
-                        String message = new String(recievedPacket.getData(), 0, recievedPacket.getLength(), StandardCharsets.ISO_8859_1);                        //debug
-                        System.out.println(message);
+                        String[] message = NetFunctions.getUdpPacketMessageLines(recievedPacket);
+                        //debug
+                        for(String line : message){
+                            System.out.println(line);
+                        }
+                        // adiciona os dados do servidor encontrado a uma lista estática de servidores encontrados
+                        FoundServers.addServer(message[2], Integer.parseInt(message[3]), (Inet4Address)recievedPacket.getAddress(), Integer.parseInt(message[1]));
                     }catch(SocketTimeoutException e){
                         System.out.println("Deu timeout, sem respostas nessa rede por 1 segundo.");
                         timedOut = true;

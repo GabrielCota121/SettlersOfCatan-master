@@ -7,11 +7,11 @@ public class ServerData {
     private static String nomeServer = "Unnamed Server";
     private static int numeroJogadores = 0;
 
-    public static void setNomeServer(String nomeServer) throws NomeServerMuitoLongoException {
+    public static void setNomeServer(String nome) throws NomeServerMuitoLongoException {
         if(nomeServer.length()> GeneralConfig.maxServerNameSize){
             throw new NomeServerMuitoLongoException();
         }
-        nomeServer = nomeServer;
+        nomeServer = nome;
     }
 
     public static String getNomeServer() {

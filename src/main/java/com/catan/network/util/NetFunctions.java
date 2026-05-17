@@ -1,11 +1,16 @@
 package com.catan.network.util;
 
 import java.io.IOException;
+import java.net.DatagramPacket;
 import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.ServerSocket;
+import java.nio.charset.StandardCharsets;
 
 public class NetFunctions {
+    public static String[] getUdpPacketMessageLines(DatagramPacket packet){
+        return StringFunctions.getMessageLines(new String(packet.getData(), 0, packet.getLength(), StandardCharsets.ISO_8859_1));
+    }
     public static boolean isIpV4Address(InetAddress ip) {
         return ip instanceof Inet4Address;
     }

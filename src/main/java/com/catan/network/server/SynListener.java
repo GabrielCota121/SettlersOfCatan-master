@@ -2,6 +2,7 @@ package com.catan.network.server;
 
 import com.catan.network.packets.PacketBuilder;
 import com.catan.network.packets.Packets;
+import com.catan.network.util.NetFunctions;
 import com.catan.network.util.StringFunctions;
 
 import java.io.IOException;
@@ -33,13 +34,16 @@ public class SynListener extends Thread{
             try {
                 // todo implementar cálculo de tamanho dinâmico
                 DatagramPacket recievedPacket = new DatagramPacket(buffer, 16); // Lẽ o tamanho de um syn do buffer
+                System.out.println("Aguardando recebimento de um pacote.");
                 socket.receive(recievedPacket);
-                String message = new String(recievedPacket.getData(), 0, recievedPacket.getLength(), StandardCharsets.ISO_8859_1);
-                //debug
-                System.out.println(message);
+                System.out.println("Pacote recebido!");
                 // gerar synack de resposta
+                String[] messageLines = NetFunctions.getUdpPacketMessageLines(recievedPacket);
+                // debug
+                for(String line : messageLines){
+                    System.out.println(line);
+                }
 
-                String[] messageLines = StringFunctions.getMessageLines(message);
                 if(messageLines.length > 0 && messageLines[0].equals(Packets.getPacketName(Packets.SYN))){ // se tem mensagem e o cabeçalho da mensagem é a string SYN
                     Inet4Address ipCliente = (Inet4Address) recievedPacket.getAddress(); // ip para onde eu devo mandar a resposta
                     int portaUdpDestino = Integer.parseInt(messageLines[1]);
