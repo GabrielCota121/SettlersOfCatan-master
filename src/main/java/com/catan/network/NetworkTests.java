@@ -1,11 +1,16 @@
 package com.catan.network;
 
+import com.catan.network.client.ClientUdpListener;
+import com.catan.network.client.FoundServers;
 import com.catan.network.client.ScanForGames;
 import com.catan.network.exception.NomeServerMuitoLongoException;
+import com.catan.network.packets.PacketBuilder;
 import com.catan.network.server.ServerData;
-import com.catan.network.server.SynListener;
+import com.catan.network.server.ServerUdpListener;
 import javax.swing.*;
 import java.io.IOException;
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
 import java.nio.charset.StandardCharsets;
 import static java.lang.Thread.sleep;
 
@@ -20,7 +25,7 @@ public class NetworkTests {
         // verificando se ele parseia corretamente
         System.out.println(Integer.parseInt("002556"));
        // iniciando o listener de syn
-        SynListener listener = new SynListener();
+        ServerUdpListener listener = new ServerUdpListener();
         ScanForGames scan = new ScanForGames();
         if(type == 's'){
             ServerData.setNomeServer(JOptionPane.showInputDialog("Qual o nome do servidor? 20 caracteres."));
@@ -31,6 +36,15 @@ public class NetworkTests {
             listener.start();
             scan.scan();
         }
+        scan.join();
+        int conectar = Integer.parseInt(JOptionPane.showInputDialog("Em qual server conectar? Há "+ FoundServers.getAllFoundServers().size()+" servers disponíveis."));
 
+        ClientUdpListener listenerC = new ClientUdpListener();
+        listenerC.run();
+
+        DatagramPacket packet = PacketBuilder.buildConnect(FoundServers.getAllFoundServers().get(conectar-1));
+
+        DatagramSocket socket = new DatagramSocket();
+        socket.send(packet);
     }
 }

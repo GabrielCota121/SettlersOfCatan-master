@@ -15,6 +15,10 @@ import java.util.List;
 import static com.catan.network.util.NetFunctions.isIpV4Address;
 
 public class ScanForGames extends Thread {
+    DatagramSocket socketUdpRecebimento = UdpSocket.getUdpSocket();
+
+    public ScanForGames() throws SocketException {
+    }
 
     public void scan(){
         start();
@@ -43,33 +47,34 @@ public class ScanForGames extends Thread {
                 }
             }
             // passo 2: criados os sockets de broadcast, criar um server socket pra cada rede local e aguardar respostas do servidores
-            DatagramSocket socketUdpRecebimento = new DatagramSocket(ClientPorts.getUdpPort()); // preparo um socket para receber os synacks
+
             socketUdpRecebimento.setSoTimeout(1000); // vou esperar apenas 1s antes de desistir e passar para a próxima rede
             byte[] buffer = new byte[1024]; // o buffer que vou usar para receber os synacks. Posso receber uma pancada de uma única rede
             for(Inet4Address broadcastAddr:broadcastAddresses){
-                System.out.println("Cliente enviará um Syn para "+broadcastAddr.toString());
+                System.out.println("SFG: Cliente enviará um Syn para "+broadcastAddr.toString());
                 DatagramSocket socketBroad = new DatagramSocket(); // crio um socket de broadcast em qualquer porta aberta
                 socketBroad.setBroadcast(true);
                 socketBroad.send(PacketBuilder.buildSyn(broadcastAddr, ServerPorts.getServerUdpPort(), ClientPorts.getUdpPort()));
-                System.out.println("Enviado");
+                System.out.println("SFG: Enviado");
                 // enviado, aguardar respostas aqui.
                 // lança socketTimeoutException se o tempo expirar
                 boolean timedOut = false;
                 while(!timedOut){ // enquanto não der um timeout, significa que estou recebendo respostas
                     try{
-                        System.out.println("Esperando respostas da rede "+broadcastAddr.toString());
+                        System.out.println("SFG: Esperando respostas da rede "+broadcastAddr.toString());
                         DatagramPacket recievedPacket = new DatagramPacket(buffer, buffer.length); // todo verificar tamanho do pacote pra ler somente o necessário do buffer
                         socketUdpRecebimento.receive(recievedPacket);
-                        System.out.println("recebi uma resposta");
+                        System.out.println("SFG: recebi uma resposta");
                         String[] message = NetFunctions.getUdpPacketMessageLines(recievedPacket);
                         //debug
                         for(String line : message){
                             System.out.println(line);
                         }
                         // adiciona os dados do servidor encontrado a uma lista estática de servidores encontrados
-                        FoundServers.addServer(message[2], Integer.parseInt(message[3]), (Inet4Address)recievedPacket.getAddress(), Integer.parseInt(message[1]));
+                        System.out.println("Debug... Porta de origem do pacote igual à porta udp do server? "+(recievedPacket.getPort()==ServerPorts.getServerUdpPort()));
+                        FoundServers.addServer(message[2], Integer.parseInt(message[3]), (Inet4Address)recievedPacket.getAddress(), Integer.parseInt(message[1]), Integer.parseInt(message[4]));
                     }catch(SocketTimeoutException e){
-                        System.out.println("Deu timeout, sem respostas nessa rede por 1 segundo.");
+                        System.out.println("SFG: Deu timeout, sem respostas nessa rede por 1 segundo.");
                         timedOut = true;
                     }
                 }
