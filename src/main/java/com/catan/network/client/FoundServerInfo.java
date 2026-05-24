@@ -6,15 +6,11 @@ public class FoundServerInfo {
     private String nome;
     private int quantidadeJogadores;
     private Inet4Address ip;
-    private int portaTcp;
-    private int portaUdp;
 
-    public FoundServerInfo(String nome, int quantidadeJogadores, Inet4Address ip, int portaTcp, int portaUdp) {
+    public FoundServerInfo(String nome, int quantidadeJogadores, Inet4Address ip) {
         setNome(nome);
         setQuantidadeJogadores(quantidadeJogadores);
         setIp(ip);
-        setPortaTcp(portaTcp);
-        setPortaUdp(portaUdp);
     }
     public void setNome(String nome){
         this.nome = nome.substring(0, nome.indexOf("\0")); // tira os /0 do final
@@ -39,18 +35,8 @@ public class FoundServerInfo {
         this.ip = ip;
     }
 
-    public int getPortaTcp() {
-        return portaTcp;
-    }
-
-    public int getPortaUdp() {
-        return portaUdp;
-    }
-
-    public void setPortaTcp(int portaTcp) {
-        this.portaTcp = portaTcp;
-    }
-    public void setPortaUdp(int portaUdp) {
-        this.portaUdp = portaUdp;
+    @Override
+    public String toString() {
+        return getNome()+", "+getIp();
     }
 }

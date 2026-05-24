@@ -26,11 +26,11 @@ public class ServerUdpListener extends Thread{
     @Override
     public void run(){
         System.out.println("SynListener started");
-        byte[] buffer = new byte[1024];
+        byte[] buffer = new byte[50];
         while(!stop){
             try {
                 // todo implementar cálculo de tamanho dinâmico
-                DatagramPacket recievedPacket = new DatagramPacket(buffer, 16); // Lẽ o tamanho de um syn do buffer
+                DatagramPacket recievedPacket = new DatagramPacket(buffer, buffer.length); // Lẽ o tamanho de um syn do buffer
                 System.out.println("SUL: Aguardando recebimento de um pacote.");
                 socket.receive(recievedPacket);
                 System.out.println("SUL: Pacote recebido!");
@@ -40,15 +40,13 @@ public class ServerUdpListener extends Thread{
                 for(String line : messageLines){
                     System.out.println(line);
                 }
-
-                if(messageLines.length > 0){ // se tem mensagem e o cabeçalho da mensagem é a string SYN
+                Inet4Address ipCliente = (Inet4Address) recievedPacket.getAddress();
+                if(messageLines.length > 0){
                     if(messageLines[0].equals(Packets.getPacketName(Packets.SYN))){
-                        Inet4Address ipCliente = (Inet4Address) recievedPacket.getAddress(); // ip para onde eu devo mandar a resposta
-                        int portaUdpDestino = Integer.parseInt(messageLines[1]);
-                        DatagramPacket synAck = PacketBuilder.buildSynAck(ipCliente, portaUdpDestino, ServerPorts.getServerTcpPort(), ServerPorts.getServerUdpPort(), ServerData.getNomeServer(), ServerData.getNumeroJogadores());
-                        socketEnvio.send(synAck);
+                        System.out.println("SUL: Pacote é um SYN");
+                        responderSyn(ipCliente, messageLines);
                     }else if(messageLines[0].equals(Packets.getPacketName(Packets.CONNECT))){
-                        System.out.println("SUL: Pacote é um connect");
+                        System.out.println("SUL: Pacote é um CONNECT");
 
                     }
                 }
@@ -59,6 +57,14 @@ public class ServerUdpListener extends Thread{
                 throw new RuntimeException(e);
             }
         }
+
+    }
+    private void responderSyn(Inet4Address ipCliente, String[] messageLines) throws IOException {
+        int portaUdpDestino = Integer.parseInt(messageLines[1]);
+        DatagramPacket synAck = PacketBuilder.buildSynAck(ipCliente, portaUdpDestino, ServerData.getNomeServer(), ServerData.getNumeroJogadores());
+        socketEnvio.send(synAck);
+    }
+    private void responderConnect(Inet4Address ipCliente, String[] messageLines) throws IOException {
 
     }
 

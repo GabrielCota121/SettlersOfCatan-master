@@ -3,11 +3,9 @@ package com.catan.network.client;
 import com.catan.network.packets.PacketBuilder;
 import com.catan.network.server.ServerPorts;
 import com.catan.network.util.NetFunctions;
-import com.catan.network.util.StringFunctions;
 
 import java.io.IOException;
 import java.net.*;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.List;
@@ -54,7 +52,7 @@ public class ScanForGames extends Thread {
                 System.out.println("SFG: Cliente enviará um Syn para "+broadcastAddr.toString());
                 DatagramSocket socketBroad = new DatagramSocket(); // crio um socket de broadcast em qualquer porta aberta
                 socketBroad.setBroadcast(true);
-                socketBroad.send(PacketBuilder.buildSyn(broadcastAddr, ServerPorts.getServerUdpPort(), ClientPorts.getUdpPort()));
+                socketBroad.send(PacketBuilder.buildSyn(broadcastAddr, ClientPorts.getUdpPort()));
                 System.out.println("SFG: Enviado");
                 // enviado, aguardar respostas aqui.
                 // lança socketTimeoutException se o tempo expirar
@@ -71,8 +69,7 @@ public class ScanForGames extends Thread {
                             System.out.println(line);
                         }
                         // adiciona os dados do servidor encontrado a uma lista estática de servidores encontrados
-                        System.out.println("Debug... Porta de origem do pacote igual à porta udp do server? "+(recievedPacket.getPort()==ServerPorts.getServerUdpPort()));
-                        FoundServers.addServer(message[2], Integer.parseInt(message[3]), (Inet4Address)recievedPacket.getAddress(), Integer.parseInt(message[1]), Integer.parseInt(message[4]));
+                        FoundServers.addServer(message[1], Integer.parseInt(message[2]), (Inet4Address)recievedPacket.getAddress());
                     }catch(SocketTimeoutException e){
                         System.out.println("SFG: Deu timeout, sem respostas nessa rede por 1 segundo.");
                         timedOut = true;

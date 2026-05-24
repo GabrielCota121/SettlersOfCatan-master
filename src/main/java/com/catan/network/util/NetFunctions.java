@@ -5,9 +5,7 @@ import java.net.*;
 import java.nio.charset.StandardCharsets;
 
 public class NetFunctions {
-    private static Socket createTcpSocket(InetAddress address, int port) throws IOException {
-        return new Socket(address, port);
-    }
+
     public static String[] getUdpPacketMessageLines(DatagramPacket packet){
         return StringFunctions.getMessageLines(new String(packet.getData(), 0, packet.getLength(), StandardCharsets.ISO_8859_1));
     }
