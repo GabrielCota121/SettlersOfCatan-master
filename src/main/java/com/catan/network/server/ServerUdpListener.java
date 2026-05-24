@@ -1,5 +1,9 @@
 package com.catan.network.server;
 
+import com.catan.model.player.Player;
+import com.catan.network.exception.NomePlayerMuitoLongoException;
+import com.catan.network.exception.NomeServerMuitoLongoException;
+import com.catan.network.exception.PortaInvalidaException;
 import com.catan.network.packets.PacketBuilder;
 import com.catan.network.packets.Packets;
 import com.catan.network.util.NetFunctions;
@@ -9,6 +13,7 @@ import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.Inet4Address;
 import java.net.SocketException;
+import java.util.List;
 
 public class ServerUdpListener extends Thread{
     DatagramSocket socket = new DatagramSocket(ServerPorts.getServerUdpPort());
@@ -47,7 +52,7 @@ public class ServerUdpListener extends Thread{
                         responderSyn(ipCliente, messageLines);
                     }else if(messageLines[0].equals(Packets.getPacketName(Packets.CONNECT))){
                         System.out.println("SUL: Pacote é um CONNECT");
-
+                        responderConnect(ipCliente, messageLines);
                     }
                 }
             } catch (SocketException e) {
@@ -65,7 +70,29 @@ public class ServerUdpListener extends Thread{
         socketEnvio.send(synAck);
     }
     private void responderConnect(Inet4Address ipCliente, String[] messageLines) throws IOException {
-
+        DatagramPacket resposta;
+        int portaCliente = Integer.parseInt(messageLines[2]);
+        if(ServerData.getNumeroJogadores() == 6){ // se a quantidade de jogadores for igual a 6, a partida está cheia
+            System.out.println("SUL: Partida cheia.");
+            resposta = PacketBuilder.buildError(ipCliente, portaCliente, "Não é possível conectar porque a partida está cheia.");
+        }else{ // se não estiver cheia, o cara pode entrar
+            try{
+                System.out.println("SUL: Tentando cadastrar o player");
+                ServerData.addPlayer(messageLines[1]);
+                List<Player> players = ServerData.getPlayers();
+                Player currentPlayer = players.get(players.size()-1);
+                currentPlayer.setIp(ipCliente);
+                currentPlayer.setPorta(portaCliente);
+                resposta = PacketBuilder.buildConAck(ipCliente, portaCliente, currentPlayer.getColor());
+                System.out.println("SUL: Deu tudo certo.");
+            }catch(NomePlayerMuitoLongoException e){
+                System.out.println("SUL: Nome do Player muito longo");
+                resposta = PacketBuilder.buildError(ipCliente, portaCliente, "Nome de Player muito longo.");
+            } catch (PortaInvalidaException e) {
+                throw new RuntimeException("Porta inválida? Isso não devia ter acontecido");
+            }
+        }
+        socketEnvio.send(resposta);
     }
 
 }

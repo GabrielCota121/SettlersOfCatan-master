@@ -51,8 +51,12 @@ public class PacketBuilder {
         byte[] messageBytes = StringFunctions.getStringBytesAsIso88591(message);
         return new DatagramPacket(messageBytes, messageBytes.length, server.getIp(), ServerPorts.getServerUdpPort());
     }
-
-    public static String buildConAckMessage(){
+    public static DatagramPacket buildError(Inet4Address ipDestino, int portaDestino, String message){
+        byte[] messageBytes = StringFunctions.getStringBytesAsIso88591(message);
+        return new DatagramPacket(messageBytes, messageBytes.length, ipDestino, portaDestino);
+    }
+    public static DatagramPacket buildConAck(Inet4Address ipCliente, int portaCliente, String cor){
+        // todo montar o pacote
         return null;
     }
 }

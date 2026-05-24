@@ -3,7 +3,10 @@ package com.catan.model.player;
 import com.catan.model.building.BuildingCost;
 import com.catan.model.cards.IDevelopmentCard;
 import com.catan.model.game.ResourceType;
+import com.catan.network.exception.PortaInvalidaException;
+import com.catan.network.util.NetFunctions;
 
+import java.net.Inet4Address;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -23,6 +26,28 @@ public class Player {
     private int longestRoad;
     private final List<IDevelopmentCard> playableCards = new ArrayList<>();
     private final List<IDevelopmentCard> newCards = new ArrayList<>();
+
+    private Inet4Address ip = null;
+    private Integer porta = null;
+
+    public void setPorta(Integer porta) throws PortaInvalidaException {
+        if(!NetFunctions.isPortValid(porta)){
+            throw new PortaInvalidaException(porta);
+        }
+        this.porta = porta;
+    }
+    public void setIp(Inet4Address ip) {
+        this.ip = ip;
+    }
+
+    public Integer getPorta() {
+        return porta;
+    }
+
+    public Inet4Address getIp() {
+        return ip;
+    }
+
 
     public Player(int id, String name, String color) {
         this.id = id;
