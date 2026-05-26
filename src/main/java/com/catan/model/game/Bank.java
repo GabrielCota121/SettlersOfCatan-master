@@ -34,7 +34,7 @@ public class Bank {
         }
     }
 
-    public void distributeResources(int roll, Board board, Robber robber, IGameLogger logger) {
+    public void distributeResources(int roll, Board board, Robber robber, IGameLogger logger, StatisticsManager stats) {
         Map<ResourceType, Integer> totalDemand = new HashMap<>();
         Map<Player, Map<ResourceType, Integer>> pendingDistribution = new HashMap<>();
 
@@ -73,6 +73,7 @@ public class Bank {
                 if (wallet.getResourceAmount(type) >= totalDemand.get(type)) {
                     wallet.removeResource(type, amountDue);
                     player.getWallet().addResource(type, amountDue);
+                    if (stats != null) stats.recordResourceGained(player, type, amountDue);
                     logger.log(player.getName() + " recebeu " + amountDue + " " + type);
                 } else {
                     if (totalDemand.get(type) > 0) {

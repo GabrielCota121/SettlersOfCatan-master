@@ -13,6 +13,8 @@ public class GameOverState implements ITurnState {
         this.winner = winner;
     }
 
+    public Player getWinner() { return winner; }
+
     @Override
     public String getName() { return "Fim de Jogo" + winner.getName() + " venceu!";}
 

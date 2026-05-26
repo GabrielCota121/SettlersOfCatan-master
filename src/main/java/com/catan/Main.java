@@ -41,6 +41,8 @@ import javafx.application.Platform;
 import java.util.*;
 
 public class Main extends Application {
+    // Instance pointer for tests to access the running Main
+    public static volatile Main INSTANCE;
 
     private static final int WIDTH = 1600;
     private static final int HEIGHT = 900;
@@ -62,8 +64,12 @@ public class Main extends Application {
 
     private Image robberImage;
 
+    private Canvas canvas;
     private VBox rightSidebar;
     private VBox bankSidebarBox;
+    private StackPane overlayPane;
+    private VBox overlayContent;
+    private int activeOverlayTab = 0;
 
     private double zoomLevel = 0.18;
     private double offsetX = 60;
@@ -79,6 +85,7 @@ public class Main extends Application {
     };
 
     public void start(Stage primaryStage) {
+        INSTANCE = this;
         loadAssets();
         Runnable[] updateActionUIRef = new Runnable[1];
 
@@ -112,7 +119,7 @@ public class Main extends Application {
         logger.log("Fase atual: " + gameManager.getCurrentTurn().getState().getName());
         logger.log(gameManager.getCurrentTurn().getCurrentPlayer().getName() + " começa!");
 
-        Canvas canvas = new Canvas(WIDTH, HEIGHT);
+        canvas = new Canvas(WIDTH, HEIGHT);
         GraphicsContext gc = canvas.getGraphicsContext2D();
 
         canvas.setOnMousePressed(event -> {
@@ -612,8 +619,25 @@ public class Main extends Application {
     private void updateSidebar() {
         if (rightSidebar == null) return;
 
-        rightSidebar.getChildren().clear();
         ITurnState state = gameManager.getCurrentTurn().getState();
+
+        if (state instanceof com.catan.model.state.GameOverState) {
+            com.catan.model.state.GameOverState gos = (com.catan.model.state.GameOverState) state;
+            Player winner = gos.getWinner();
+            if (overlayPane == null || overlayPane.getParent() == null) {
+                javafx.application.Platform.runLater(() -> {
+                    StackPane canvasContainer = (StackPane) canvas.getParent();
+                    if (canvasContainer != null && !canvasContainer.getChildren().contains(overlayPane)) {
+                        showGameOverOverlay(winner);
+                        canvasContainer.getChildren().add(overlayPane);
+                    }
+                });
+            }
+            buildPlayerOverviewSidebar();
+            return;
+        }
+
+        rightSidebar.getChildren().clear();
 
         if (state instanceof WaitingDiscardState discardState) {
             List<Player> pending = discardState.getPendingPlayers();
@@ -884,6 +908,7 @@ public class Main extends Application {
 
             gameManager.getBank().getWallet().removeResource(receive, 1);
             player.getWallet().addResource(receive, 1);
+            gameManager.getStatisticsManager().recordBankTrade(player);
 
             gameManager.getLogger().log(player.getName() + " trocou " + rate + " " + offer + " por 1 " + receive + ".");
             updateSidebar();
@@ -1425,7 +1450,294 @@ public class Main extends Application {
         return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
     }
 
+    private void showGameOverOverlay(Player winner) {
+        if (overlayPane != null && overlayPane.getParent() != null) return;
+
+        overlayPane = new StackPane();
+        overlayPane.setStyle("-fx-background-color: rgba(0,0,0,0.75);");
+        overlayPane.setAlignment(javafx.geometry.Pos.CENTER);
+
+        VBox card = new VBox(0);
+        card.setStyle("-fx-background-color: #1e2a38; -fx-background-radius: 14; -fx-padding: 0; -fx-max-width: 700; -fx-min-width: 620;");
+        card.setMaxHeight(520);
+
+        // ── Cabeçalho ──
+        VBox header = new VBox(4);
+        header.setStyle("-fx-background-color: #16202c; -fx-padding: 20 24 16 24; -fx-background-radius: 14 14 0 0;");
+        header.setAlignment(javafx.geometry.Pos.CENTER);
+
+        Label titleLabel = new Label("🏆  " + winner.getName() + " venceu!");
+        titleLabel.setStyle("-fx-text-fill: #f1c40f; -fx-font-size: 26px; -fx-font-weight: bold;");
+
+        int turnCount = gameManager.getStatisticsManager().getTotalTurns();
+        Label subtitleLabel = new Label("Turnos jogados: " + turnCount);
+        subtitleLabel.setStyle("-fx-text-fill: #7f8c8d; -fx-font-size: 14px;");
+
+        header.getChildren().addAll(titleLabel, subtitleLabel);
+
+        // ── Abas ──
+        String[] tabNames = {"Visão Geral", "Dados", "Recursos", "Dev Cards"};
+        HBox tabBar = new HBox(0);
+        tabBar.setStyle("-fx-background-color: #16202c; -fx-padding: 0 24 0 24;");
+
+        javafx.scene.control.ScrollPane scrollPane = new javafx.scene.control.ScrollPane();
+        scrollPane.setFitToWidth(true);
+        scrollPane.setHbarPolicy(javafx.scene.control.ScrollPane.ScrollBarPolicy.NEVER);
+        scrollPane.setVbarPolicy(javafx.scene.control.ScrollPane.ScrollBarPolicy.AS_NEEDED);
+        scrollPane.setStyle("-fx-background: #1e2a38; -fx-background-color: #1e2a38; -fx-border-color: transparent;");
+        scrollPane.setPrefHeight(350);
+
+        overlayContent = new VBox(16);
+        overlayContent.setStyle("-fx-padding: 20 24 20 24; -fx-background-color: #1e2a38;");
+        scrollPane.setContent(overlayContent);
+
+        Button[] tabButtons = new Button[tabNames.length];
+        Runnable[] renderTab = new Runnable[tabNames.length];
+        activeOverlayTab = 0;
+
+        Runnable refreshTabs = () -> {
+            for (int i = 0; i < tabButtons.length; i++) {
+                boolean active = i == activeOverlayTab;
+                tabButtons[i].setStyle(
+                    "-fx-background-color: " + (active ? "#1e2a38" : "transparent") + ";" +
+                    "-fx-text-fill: " + (active ? "#ecf0f1" : "#7f8c8d") + ";" +
+                    "-fx-font-size: 13px; -fx-font-weight: " + (active ? "bold" : "normal") + ";" +
+                    "-fx-padding: 10 18 10 18; -fx-background-radius: 0; -fx-cursor: hand;" +
+                    "-fx-border-color: transparent transparent " + (active ? "#3498db" : "transparent") + " transparent;" +
+                    "-fx-border-width: 0 0 2 0;"
+                );
+            }
+        };
+
+        for (int i = 0; i < tabNames.length; i++) {
+            final int idx = i;
+            tabButtons[i] = new Button(tabNames[i]);
+            tabButtons[i].setOnAction(e -> {
+                activeOverlayTab = idx;
+                refreshTabs.run();
+                renderTab[idx].run();
+            });
+            tabBar.getChildren().add(tabButtons[i]);
+        }
+
+        // ── Conteúdo das abas ──
+        renderTab[0] = () -> {
+            overlayContent.getChildren().clear();
+            for (Player p : gameManager.getPlayers()) {
+                HBox row = new HBox(20);
+                row.setStyle("-fx-background-color: #2c3e50; -fx-padding: 12 16 12 16; -fx-background-radius: 8;");
+                row.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+
+                Label rank = new Label(p.equals(winner) ? "🥇" : "");
+                rank.setStyle("-fx-font-size: 20px;");
+
+                VBox nameBox = new VBox(2);
+                Label name = new Label(p.getName());
+                name.setStyle("-fx-text-fill: white; -fx-font-size: 16px; -fx-font-weight: bold;");
+                Label color = new Label("● " + p.getColor());
+                color.setStyle("-fx-text-fill: #7f8c8d; -fx-font-size: 11px;");
+                nameBox.getChildren().addAll(name, color);
+
+                HBox statsRow = new HBox(20);
+                statsRow.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+                statsRow.getChildren().addAll(
+                    makeStatBlock("⭐", String.valueOf(p.getVictoryPoints()), "Pontos"),
+                    makeStatBlock("🏠", String.valueOf(p.getNumSettlements()), "Sett."),
+                    makeStatBlock("🏙", String.valueOf(p.getNumCities()), "Cidades"),
+                    makeStatBlock("🛣", String.valueOf(p.getNumRoads()), "Estradas"),
+                    makeStatBlock("⚔", String.valueOf(p.getNumKnights()), "Knights")
+                );
+
+                javafx.scene.layout.Region spacer = new javafx.scene.layout.Region();
+                HBox.setHgrow(spacer, javafx.scene.layout.Priority.ALWAYS);
+                row.getChildren().addAll(rank, nameBox, spacer, statsRow);
+                overlayContent.getChildren().add(row);
+            }
+        };
+
+        renderTab[1] = () -> {
+            overlayContent.getChildren().clear();
+            Label heading = new Label("Frequência dos Dados");
+            heading.setStyle("-fx-text-fill: #ecf0f1; -fx-font-size: 15px; -fx-font-weight: bold;");
+
+            Map<Integer, Integer> counts = gameManager.getStatisticsManager().getDiceRollCounts();
+            int maxCount = counts.values().stream().mapToInt(Integer::intValue).max().orElse(1);
+            if (maxCount == 0) maxCount = 1;
+
+            HBox chartBox = new HBox(8);
+            chartBox.setAlignment(javafx.geometry.Pos.BOTTOM_CENTER);
+            chartBox.setPrefHeight(180);
+
+            for (int i = 2; i <= 12; i++) {
+                int count = counts.getOrDefault(i, 0);
+                double ratio = (double) count / maxCount;
+                int barH = Math.max(4, (int)(ratio * 140));
+
+                VBox barCol = new VBox(4);
+                barCol.setAlignment(javafx.geometry.Pos.BOTTOM_CENTER);
+
+                Label countLabel = new Label(String.valueOf(count));
+                countLabel.setStyle("-fx-text-fill: #bdc3c7; -fx-font-size: 11px;");
+
+                javafx.scene.layout.Region bar = new javafx.scene.layout.Region();
+                bar.setPrefWidth(36);
+                bar.setPrefHeight(barH);
+                String barColor = (i == 7) ? "#e74c3c" : "#3498db";
+                bar.setStyle("-fx-background-color: " + barColor + "; -fx-background-radius: 3 3 0 0;");
+
+                Label numLabel = new Label(String.valueOf(i));
+                numLabel.setStyle("-fx-text-fill: #7f8c8d; -fx-font-size: 11px;");
+
+                barCol.getChildren().addAll(countLabel, bar, numLabel);
+                chartBox.getChildren().add(barCol);
+            }
+
+            overlayContent.getChildren().addAll(heading, chartBox);
+        };
+
+        renderTab[2] = () -> {
+            overlayContent.getChildren().clear();
+            Label heading = new Label("Recursos Coletados");
+            heading.setStyle("-fx-text-fill: #ecf0f1; -fx-font-size: 15px; -fx-font-weight: bold;");
+            overlayContent.getChildren().add(heading);
+
+            String[] resNames = {"WOOD", "BRICK", "WOOL", "WHEAT", "ORE"};
+            String[] resColors = {"#27ae60","#e74c3c","#ecf0f1","#f39c12","#95a5a6"};
+
+            for (Player p : gameManager.getPlayers()) {
+                VBox playerBlock = new VBox(6);
+                playerBlock.setStyle("-fx-background-color: #2c3e50; -fx-padding: 10 14 10 14; -fx-background-radius: 8;");
+
+                Label pName = new Label(p.getName() +
+                    "  (total: " + gameManager.getStatisticsManager().getTotalResourcesGainedBy(p) + ")");
+                pName.setStyle("-fx-text-fill: white; -fx-font-size: 13px; -fx-font-weight: bold;");
+
+                HBox resRow = new HBox(12);
+                resRow.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+
+                Map<com.catan.model.game.ResourceType, Integer> gained =
+                    gameManager.getStatisticsManager().getResourcesGainedBy(p);
+
+                for (int i = 0; i < resNames.length; i++) {
+                    try {
+                        com.catan.model.game.ResourceType rt =
+                            com.catan.model.game.ResourceType.valueOf(resNames[i]);
+                        int amt = gained.getOrDefault(rt, 0);
+
+                        VBox resBlock = new VBox(2);
+                        resBlock.setAlignment(javafx.geometry.Pos.CENTER);
+
+                        Label resAmt = new Label(String.valueOf(amt));
+                        resAmt.setStyle("-fx-text-fill: " + resColors[i] + "; -fx-font-size: 16px; -fx-font-weight: bold;");
+
+                        Label resName = new Label(resNames[i].substring(0, 2));
+                        resName.setStyle("-fx-text-fill: #7f8c8d; -fx-font-size: 10px;");
+
+                        resBlock.getChildren().addAll(resAmt, resName);
+                        resRow.getChildren().add(resBlock);
+                    } catch (Exception ignored) {}
+                }
+
+                playerBlock.getChildren().addAll(pName, resRow);
+                overlayContent.getChildren().add(playerBlock);
+            }
+        };
+
+        renderTab[3] = () -> {
+            overlayContent.getChildren().clear();
+            Label heading = new Label("Dev Cards Compradas");
+            heading.setStyle("-fx-text-fill: #ecf0f1; -fx-font-size: 15px; -fx-font-weight: bold;");
+            overlayContent.getChildren().add(heading);
+
+            for (Player p : gameManager.getPlayers()) {
+                HBox row = new HBox(20);
+                row.setStyle("-fx-background-color: #2c3e50; -fx-padding: 12 16 12 16; -fx-background-radius: 8;");
+                row.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+
+                Label pName = new Label(p.getName());
+                pName.setStyle("-fx-text-fill: white; -fx-font-size: 14px; -fx-font-weight: bold;");
+
+                javafx.scene.layout.Region sp = new javafx.scene.layout.Region();
+                HBox.setHgrow(sp, javafx.scene.layout.Priority.ALWAYS);
+
+                Label devCount = new Label(
+                    gameManager.getStatisticsManager().getDevCardsDrawnBy(p) + " cartas");
+                devCount.setStyle("-fx-text-fill: #9b59b6; -fx-font-size: 18px; -fx-font-weight: bold;");
+
+                Label trades = new Label(
+                    "  |  🏦 " + gameManager.getStatisticsManager().getBankTradesBy(p) +
+                    "  👥 " + gameManager.getStatisticsManager().getPlayerTradesBy(p));
+                trades.setStyle("-fx-text-fill: #7f8c8d; -fx-font-size: 13px;");
+
+                row.getChildren().addAll(pName, sp, devCount, trades);
+                overlayContent.getChildren().add(row);
+            }
+        };
+
+        // Botão fechar
+        Button closeBtn = new Button("✕  Fechar");
+        closeBtn.setStyle("-fx-background-color: #c0392b; -fx-text-fill: white; -fx-font-size: 13px; -fx-font-weight: bold; -fx-padding: 8 20 8 20; -fx-background-radius: 6; -fx-cursor: hand;");
+
+        HBox footer = new HBox(closeBtn);
+        footer.setAlignment(javafx.geometry.Pos.CENTER_RIGHT);
+        footer.setStyle("-fx-padding: 12 24 16 24; -fx-background-color: #16202c; -fx-background-radius: 0 0 14 14;");
+
+        closeBtn.setOnAction(e -> {
+            javafx.scene.layout.Pane parentPane = (javafx.scene.layout.Pane) overlayPane.getParent();
+            if (parentPane != null) parentPane.getChildren().remove(overlayPane);
+        });
+
+        card.getChildren().addAll(header, tabBar, scrollPane, footer);
+        overlayPane.getChildren().add(card);
+
+        refreshTabs.run();
+        renderTab[0].run();
+    }
+
+    private VBox makeStatBlock(String icon, String value, String label) {
+        VBox block = new VBox(2);
+        block.setAlignment(javafx.geometry.Pos.CENTER);
+        Label ico = new Label(icon + " " + value);
+        ico.setStyle("-fx-text-fill: #ecf0f1; -fx-font-size: 15px; -fx-font-weight: bold;");
+        Label lbl = new Label(label);
+        lbl.setStyle("-fx-text-fill: #7f8c8d; -fx-font-size: 10px;");
+        block.getChildren().addAll(ico, lbl);
+        return block;
+    }
+
     public static void main(String[] args) {
         launch(args);
+    }
+
+    // ---------- Testing helpers ----------
+    /**
+     * Minimal initializer for tests: sets up assets, a canvas inside a StackPane scene and a CatanGameManager
+     * using the provided players. This allows tests to call showGameOverOverlayTesting to display the overlay.
+     */
+    public void initForTesting(Stage primaryStage, List<Player> players) {
+        INSTANCE = this;
+        loadAssets();
+
+        Board board = BoardFactory.createStandardBoard();
+        IGameLogger logger = new ConsoleLogger();
+        this.gameManager = new CatanGameManager(board, players, logger);
+
+        this.canvas = new Canvas(WIDTH, HEIGHT);
+        StackPane container = new StackPane(this.canvas);
+        Scene scene = new Scene(container, WIDTH, HEIGHT);
+        primaryStage.setScene(scene);
+        primaryStage.show();
+    }
+
+    /**
+     * Expose the internal game manager to tests.
+     */
+    public CatanGameManager getGameManagerForTesting() { return this.gameManager; }
+
+    /**
+     * Call the internal overlay display (which is private) from tests.
+     */
+    public void showGameOverOverlayTesting(Player winner) {
+        showGameOverOverlay(winner);
     }
 }
