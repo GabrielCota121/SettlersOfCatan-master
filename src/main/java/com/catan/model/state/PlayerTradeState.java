@@ -89,6 +89,9 @@ public class PlayerTradeState implements ITurnState {
             }
         }
 
+        currentTurn.getGameManager().getStatisticsManager().recordPlayerTrade(offer.getProposer());
+        currentTurn.getGameManager().getStatisticsManager().recordPlayerTrade(chosenPartner);
+
         String offeredStr = formatResourceMap(offer.getOfferedResources());
         String requestedStr = formatResourceMap(offer.getRequestedResources());
 

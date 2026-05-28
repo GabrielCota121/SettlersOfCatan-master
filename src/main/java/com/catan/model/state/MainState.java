@@ -137,6 +137,7 @@ public class MainState implements ITurnState {
 
             if (card != null) {
                 card.onPurchase(player);
+                gameManager.getStatisticsManager().recordDevCardDrawn(player);
                 gameManager.getBank().receiveResources(cost);
 
                 gameManager.getLogger().log(player.getName() + " comprou uma Development Card!");

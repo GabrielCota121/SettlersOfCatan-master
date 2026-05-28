@@ -30,6 +30,7 @@ public class CatanGameManager {
     private final DevelopmentDeck developmentDeck;
     private final RoadBonus roadBonus;
     private final ArmyBonus armyBonus;
+    private final StatisticsManager statisticsManager = new StatisticsManager();
 
     public CatanGameManager(Board board, List<Player> players, IGameLogger logger) {
         this.board = board;
@@ -95,6 +96,8 @@ public class CatanGameManager {
 
             this.currentTurn = new Turn(nextPlayer, this);
 
+            statisticsManager.recordTurn();
+
             if (nextPlayer.getVictoryPoints() >= 10) {
                 logger.log(nextPlayer.getName() + " já conquistou " + nextPlayer.getVictoryPoints() + " pontos e vence o jogo!!!");
                 this.currentTurn.setState(new GameOverState(nextPlayer));
@@ -124,12 +127,17 @@ public class CatanGameManager {
             logger.error(player.getName() + ", não tá na sua vez de rolar os dados, zé!");
             return false;
         }
-        return currentTurn.getState().rollDice(currentTurn);
+        boolean success = currentTurn.getState().rollDice(currentTurn);
+        if (success) {
+            int total = dice1.getResult() + dice2.getResult();
+            if (total >= 2) statisticsManager.recordDiceRoll(total);
+        }
+        return success;
     }
 
 
     public void distributeResources(int roll) {
-        bank.distributeResources(roll, board, robber, logger);
+        bank.distributeResources(roll, board, robber, logger, statisticsManager);
     }
 
     public void applyPortBonus(Player player, Port port) {
@@ -153,5 +161,9 @@ public class CatanGameManager {
 
     public IDevelopmentCard drawDevelopmentCard() {
         return developmentDeck.drawCard();
+    }
+
+    public StatisticsManager getStatisticsManager() {
+        return statisticsManager;
     }
 }
