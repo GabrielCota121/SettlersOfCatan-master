@@ -209,10 +209,36 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
         boolean applied = game.applyAction(sender, msg.getString("action"), msg.getString("targetId"));
 
         if (applied) {
+            // Notifica todos com estado atualizado
             broadcastPersonalizedState(room, game);
+
+            // Se o estado mudou para WaitingDiscard, avisa explicitamente quem precisa descartar
+            com.example.network.protocol.GameStateDTO snap = game.snapshot();
+            if (!snap.getDiscardPendingPlayers().isEmpty()) {
+                broadcastToRoom(room,
+                    NetworkMessage.of(MessageType.DISCARD_REQUIRED)
+                        .put("players", snap.getDiscardPendingPlayers())
+                        .put("amounts", snap.getDiscardAmounts()),
+                    null);
+            }
+            // Se ainda há pendentes após um SUBMIT_DISCARD, avisa quem falta
+            if ("SUBMIT_DISCARD".equals(msg.getString("action")) &&
+                    !snap.getDiscardPendingPlayers().isEmpty()) {
+                broadcastToRoom(room,
+                    NetworkMessage.of(MessageType.DISCARD_WAITING)
+                        .put("remaining", snap.getDiscardPendingPlayers()),
+                    null);
+            }
+            // Broadcast do estado da negociação para todos os jogadores da sala
+            if (snap.getActiveTrade() != null) {
+                broadcastToRoom(room,
+                    NetworkMessage.of(MessageType.TRADE_UPDATE)
+                        .put("trade", snap.getActiveTrade()),
+                    null);
+            }
         } else {
-            // Ação recusada: ressincroniza só o remetente com o seu snapshot personalizado.
-            sendTo(session, NetworkMessage.of(MessageType.GAME_STATE).put("state", game.snapshot(sender)));
+            sendTo(session,
+                NetworkMessage.of(MessageType.GAME_STATE).put("state", game.snapshot(sender)));
         }
     }
 

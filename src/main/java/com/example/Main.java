@@ -87,9 +87,12 @@ public class Main extends Application {
 
     private VBox rightSidebar;
     private VBox bankSidebarBox;
+    private TextArea logArea;
     private Label playerNameLabel;
     private ImageView playerIconView;
     private PlayerHandView handView;
+    private Player myPlayer = null;
+    // jogador local deste cliente — definido em startGame quando online
 
     private double zoomLevel = 0.18;
     private double offsetX = 60;
@@ -156,7 +159,17 @@ public class Main extends Application {
             players.add(new Player(4, "Lucas", "GREEN"));
         }
 
-        TextArea logArea = new TextArea();
+        if (online && gameClient != null) {
+            String myName = gameClient.getPlayerName();
+            myPlayer = players.stream()
+                .filter(p -> p.getName().equals(myName))
+                .findFirst()
+                .orElse(null);
+            System.out.println("Jogador local identificado: " +
+                (myPlayer != null ? myPlayer.getName() : "null"));
+        }
+
+        logArea = new TextArea();
         logArea.setEditable(false);
         logArea.setWrapText(true);
         logArea.setStyle("-fx-control-inner-background: #2c3e50; -fx-text-fill: #ecf0f1; -fx-font-family: 'Consolas'; -fx-font-size: 14px;");
@@ -405,6 +418,20 @@ public class Main extends Application {
                             }
                             return;
                         }
+                        if (online) {
+                            switch (card.getName()) {
+                                case "Knight"         -> gameClient.sendIntent("PLAY_KNIGHT", null);
+                                case "Road Building"  -> gameClient.sendIntent("PLAY_ROAD_BUILDING", null);
+                                // Monopoly e YearOfPlenty precisam de seleção de recurso:
+                                // deixa o fluxo local rodar para mostrar a sidebar, o
+                                // botão de confirmação da sidebar envia o intent ao servidor.
+                                default -> {
+                                    boolean success = state.playDevelopmentCard(card, gameManager.getCurrentTurn());
+                                    if (success && updateActionUIRef[0] != null) updateActionUIRef[0].run();
+                                }
+                            }
+                            return;
+                        }
                         boolean success = state.playDevelopmentCard(card, gameManager.getCurrentTurn());
                         if (success && updateActionUIRef[0] != null) {
                             updateActionUIRef[0].run();
@@ -467,7 +494,10 @@ public class Main extends Application {
             diceResultLabel.setText("");
 
             Player currentPlayer = gameManager.getCurrentTurn().getCurrentPlayer();
-            handView.update(currentPlayer);
+            // Em modo online: sempre mostra a mão do jogador local.
+            // Em modo local/offline: mostra o jogador da vez (comportamento original).
+            Player viewPlayer = (online && myPlayer != null) ? myPlayer : currentPlayer;
+            handView.update(viewPlayer);
             playerNameLabel.setText(currentPlayer.getName());
             String colorName = currentPlayer.getColor().toLowerCase();
             String imagePath = "/assets/settlement/" + colorName + "set.png";
@@ -538,12 +568,23 @@ public class Main extends Application {
 
             ITurnState currentState = gameManager.getCurrentTurn().getState();
 
-            // ---- Modo online: envia a intenção por id estável; o servidor valida. ----
             if (online) {
+                // LADRÃO tem prioridade sobre construções
+                if (currentState instanceof MoveRobberState) {
+                    Tile clickedTile = findTileAt(board, worldX, worldY);
+                    if (clickedTile != null) {
+                        gameClient.sendIntent("MOVE_ROBBER",
+                            String.valueOf(clickedTile.getId()));
+                    }
+                    render(gc, board, true);
+                    return;
+                }
+
+                // Construções normais
                 Vertex v = findVertexAt(board, worldX, worldY);
                 if (v != null) {
-                    // Vértice vazio -> tenta settlement; vértice com construção -> tenta city.
-                    gameClient.sendIntent(v.isEmpty() ? "BUILD_SETTLEMENT" : "BUILD_CITY", v.getId());
+                    gameClient.sendIntent(
+                        v.isEmpty() ? "BUILD_SETTLEMENT" : "BUILD_CITY", v.getId());
                 } else {
                     Edge edge = findEdgeAt(board, worldX, worldY);
                     if (edge != null) gameClient.sendIntent("BUILD_ROAD", edge.getId());
@@ -552,18 +593,20 @@ public class Main extends Application {
                 return;
             }
 
+            // --- Modo offline: lógica original intacta ---
             if (currentState instanceof MoveRobberState) {
                 Tile clickedTile = findTileAt(board, worldX, worldY);
                 if (clickedTile != null) {
                     MoveRobberState robberState = (MoveRobberState) currentState;
-                    List<Player> victims = robberState.moveRobber(clickedTile, gameManager.getCurrentTurn());
+                    List<Player> victims = robberState.moveRobber(
+                        clickedTile, gameManager.getCurrentTurn());
                     victims.removeIf(p -> p.getWallet().getTotalCards() == 0);
-
                     if (victims.isEmpty()) {
                         robberState.executeSteal(null, gameManager.getCurrentTurn());
                         updateActionUI.run();
                     } else if (victims.size() == 1) {
-                        robberState.executeSteal(victims.get(0), gameManager.getCurrentTurn());
+                        robberState.executeSteal(victims.get(0),
+                            gameManager.getCurrentTurn());
                         updateActionUI.run();
                     } else {
                         buildStealVictimSidebar(victims, robberState, updateActionUI);
@@ -573,6 +616,7 @@ public class Main extends Application {
                 return;
             }
 
+            // Construções offline normais
             Vertex v = findVertexAt(board, worldX, worldY);
             if (v != null) {
                 boolean builtSettlement = currentState.buildSettlement(v, gameManager.getCurrentTurn());
@@ -622,7 +666,14 @@ public class Main extends Application {
         bindPlayerToUI.run();
         gameManager.setOnTurnChangedListener(bindPlayerToUI);
 
-        HBox bottomMenu = new HBox(12, playerInfoBox, handView, devCardsBox, spacer, turnControlsBox);
+        Label myNameLabel = new Label(
+            online && myPlayer != null ? "Você: " + myPlayer.getName() : ""
+        );
+        myNameLabel.setStyle(
+            "-fx-text-fill: #2ecc71; -fx-font-size: 11px; -fx-font-weight: bold;"
+        );
+
+        HBox bottomMenu = new HBox(12, playerInfoBox, myNameLabel, handView, devCardsBox, spacer, turnControlsBox);
         bottomMenu.setPrefHeight(BOTTOM_H);
         // BorderPane coloca o bottom com largura TOTAL (incluindo atrás das sidebars).
         // Adicionamos padding lateral igual às sidebars para o conteúdo ficar visível.
@@ -685,10 +736,42 @@ public class Main extends Application {
                     case MessageType.GAME_STATE -> {
                         GameStateDTO st = objectMapper.convertValue(msg.getData().get("state"), GameStateDTO.class);
                         applyGameState(st);
+                        // Garante que a handView sempre mostre o jogador local
+                        // independente de quem é o turno atual.
+                        if (myPlayer != null) {
+                            handView.update(myPlayer);
+                        }
                         bindPlayerToUI.run();
                         render(gc, board, true);
                     }
                     case MessageType.GAME_EVENT -> logArea.appendText("🎲 " + msg.getString("message") + "\n");
+                    case MessageType.TRADE_UPDATE -> {
+                        com.example.network.protocol.TradeStatusDTO trade =
+                            objectMapper.convertValue(
+                                msg.getData().get("trade"),
+                                com.example.network.protocol.TradeStatusDTO.class
+                            );
+                        Platform.runLater(() -> applyTradeUpdate(trade));
+                    }
+                    case MessageType.DISCARD_REQUIRED -> {
+                        // Mostra na log quem precisa descartar
+                        @SuppressWarnings("unchecked")
+                        List<String> discardPlayers = (List<String>) msg.getData().get("players");
+                        if (discardPlayers != null) {
+                            Platform.runLater(() ->
+                                logArea.appendText("🃏 Descarte necessário: " + String.join(", ", discardPlayers) + "\n")
+                            );
+                        }
+                    }
+                    case MessageType.DISCARD_WAITING -> {
+                        @SuppressWarnings("unchecked")
+                        List<String> remaining = (List<String>) msg.getData().get("remaining");
+                        if (remaining != null) {
+                            Platform.runLater(() ->
+                                logArea.appendText("⏳ Aguardando descarte de: " + String.join(", ", remaining) + "\n")
+                            );
+                        }
+                    }
                     default -> { /* ROOM_* já não importam dentro do jogo */ }
                 }
             });
@@ -737,6 +820,34 @@ public class Main extends Application {
             for (Tile t : board.getTiles()) {
                 if (t.getId() == state.getRobberTileId()) { gameManager.getRobber().move(t); break; }
             }
+        }
+
+        // Reconstrói WaitingDiscardState no modelo local quando o servidor
+        // informa que há jogadores pendentes de descarte.
+        if (state.getDiscardPendingPlayers() != null &&
+                !state.getDiscardPendingPlayers().isEmpty()) {
+            Map<String, Player> byName2 = new HashMap<>();
+            for (Player p : gameManager.getPlayers()) byName2.put(p.getName(), p);
+
+            List<Player> pending = state.getDiscardPendingPlayers().stream()
+                .map(byName2::get)
+                .filter(java.util.Objects::nonNull)
+                .collect(java.util.stream.Collectors.toList());
+
+            if (!(gameManager.getCurrentTurn().getState() instanceof WaitingDiscardState)) {
+                gameManager.getCurrentTurn().setState(new WaitingDiscardState(pending));
+            }
+        }
+
+        // Quando o servidor confirma MoveRobberState, mostra sidebar
+        // de escolha de vítima se houver candidatos
+        if (state.getStateName() != null &&
+                state.getStateName().contains("Robber") &&
+                online && myPlayer != null &&
+                myPlayer.getName().equals(state.getCurrentPlayerName())) {
+            // É o jogador local quem move o ladrão — nada a fazer aqui,
+            // o clique já mandou MOVE_ROBBER. Sidebar de vítima será
+            // tratada pelo próximo GAME_STATE após o servidor processar.
         }
 
         // Construções: limpa e reconstrói a partir do snapshot.
@@ -863,10 +974,14 @@ public class Main extends Application {
         confirmBtn.setOnAction(e -> {
             ResourceType selected = resourceCombo.getValue();
             if (selected != null) {
-                ITurnState state = gameManager.getCurrentTurn().getState();
-                if (state instanceof MonopolyState) {
-                    ((MonopolyState) state).chooseResource(selected, gameManager.getCurrentTurn());
-                    updateSidebar();
+                if (online) {
+                    gameClient.sendIntent("PLAY_MONOPOLY", selected.name());
+                } else {
+                    ITurnState state = gameManager.getCurrentTurn().getState();
+                    if (state instanceof MonopolyState) {
+                        ((MonopolyState) state).chooseResource(selected, gameManager.getCurrentTurn());
+                        updateSidebar();
+                    }
                 }
             } else {
                 gameManager.getLogger().log("Selecione um recurso primeiro!");
@@ -902,10 +1017,23 @@ public class Main extends Application {
             ResourceType r1 = res1Combo.getValue();
             ResourceType r2 = res2Combo.getValue();
             if (r1 != null && r2 != null) {
-                ITurnState state = gameManager.getCurrentTurn().getState();
-                if (state instanceof YearOfPlentyState) {
-                    ((YearOfPlentyState) state).chooseResources(r1, r2, gameManager.getCurrentTurn());
-                    updateSidebar();
+                if (online) {
+                    try {
+                        Map<String, String> payload = new HashMap<>();
+                        payload.put("res1", r1.name());
+                        payload.put("res2", r2.name());
+                        String json = new com.fasterxml.jackson.databind.ObjectMapper()
+                            .writeValueAsString(payload);
+                        gameClient.sendIntent("PLAY_YEAR_OF_PLENTY", json);
+                    } catch (Exception ex) {
+                        ex.printStackTrace();
+                    }
+                } else {
+                    ITurnState state = gameManager.getCurrentTurn().getState();
+                    if (state instanceof YearOfPlentyState) {
+                        ((YearOfPlentyState) state).chooseResources(r1, r2, gameManager.getCurrentTurn());
+                        updateSidebar();
+                    }
                 }
             } else {
                 gameManager.getLogger().log("Selecione os dois recursos primeiro!");
@@ -988,13 +1116,37 @@ public class Main extends Application {
                 offered.put(type, offerSpinners.get(type).getValue());
                 requested.put(type, requestSpinners.get(type).getValue());
             }
-            try {
-                TradeOffer offer = new TradeOffer(proposer, offered, requested);
-                Turn currentTurn = gameManager.getCurrentTurn();
-                currentTurn.setState(new PlayerTradeState(offer, gameManager.getPlayers()));
-                updateSidebar();
-            } catch (IllegalArgumentException ex) {
-                gameManager.getLogger().log(ex.getMessage());
+            if (online) {
+                // Monta o payload e envia ao servidor
+                try {
+                    Map<String, Integer> giveMap = new HashMap<>();
+                    Map<String, Integer> wantMap = new HashMap<>();
+                    for (ResourceType rt : ResourceType.values()) {
+                        if (rt == ResourceType.DESERT) continue;
+                        int g = offered.getOrDefault(rt, 0);
+                        int w = requested.getOrDefault(rt, 0);
+                        if (g > 0) giveMap.put(rt.name(), g);
+                        if (w > 0) wantMap.put(rt.name(), w);
+                    }
+                    Map<String, Object> payload = new HashMap<>();
+                    payload.put("give", giveMap);
+                    payload.put("want", wantMap);
+                    String json = new com.fasterxml.jackson.databind.ObjectMapper()
+                        .writeValueAsString(payload);
+                    gameClient.sendIntent("PROPOSE_TRADE", json);
+                } catch (Exception ex) {
+                    ex.printStackTrace();
+                }
+            } else {
+                // Fluxo local original — mantém como estava
+                try {
+                    TradeOffer offer = new TradeOffer(proposer, offered, requested);
+                    Turn currentTurn = gameManager.getCurrentTurn();
+                    currentTurn.setState(new PlayerTradeState(offer, gameManager.getPlayers()));
+                    updateSidebar();
+                } catch (IllegalArgumentException ex) {
+                    gameManager.getLogger().log(ex.getMessage());
+                }
             }
         });
 
@@ -1077,13 +1229,31 @@ public class Main extends Application {
             ResourceType receive = receiveCombo.getValue();
             int rate = player.getTradeRates().getOrDefault(offer, 4);
 
-            player.getWallet().removeResource(offer, rate);
-            gameManager.getBank().getWallet().addResource(offer, rate);
-            gameManager.getBank().getWallet().removeResource(receive, 1);
-            player.getWallet().addResource(receive, 1);
+            if (online) {
+                try {
+                    Map<String, Integer> giveMap = new HashMap<>();
+                    giveMap.put(offer.name(), rate);
 
-            gameManager.getLogger().log(player.getName() + " trocou " + rate + " " + offer + " por 1 " + receive + ".");
-            updateSidebar();
+                    Map<String, Object> payload = new HashMap<>();
+                    payload.put("give", giveMap);
+                    payload.put("receive", receive.name());
+
+                    String json = new com.fasterxml.jackson.databind.ObjectMapper()
+                        .writeValueAsString(payload);
+                    gameClient.sendIntent("BANK_TRADE", json);
+                } catch (Exception ex) {
+                    ex.printStackTrace();
+                }
+            } else {
+                // lógica local original — mantém como estava
+                player.getWallet().removeResource(offer, rate);
+                gameManager.getBank().getWallet().addResource(offer, rate);
+                gameManager.getBank().getWallet().removeResource(receive, 1);
+                player.getWallet().addResource(receive, 1);
+
+                gameManager.getLogger().log(player.getName() + " trocou " + rate + " " + offer + " por 1 " + receive + ".");
+                updateSidebar();
+            }
         });
 
         Button btnCancel = new Button("Voltar");
@@ -1484,6 +1654,139 @@ public class Main extends Application {
         }
     }
 
+    private void applyTradeUpdate(com.example.network.protocol.TradeStatusDTO trade) {
+        if (trade == null) return;
+
+        String myName = gameClient != null ? gameClient.getPlayerName() : null;
+        boolean iAmProposer = trade.getProposerName().equals(myName);
+        boolean tradeActive = trade.isActive();
+
+        // Limpa a sidebar atual e reconstrói conforme o papel deste cliente
+        rightSidebar.getChildren().clear();
+
+        if (!tradeActive) {
+            // Troca encerrada — mostra resultado no log e volta ao estado normal
+            String msg2 = trade.getResolvedWithPlayer() != null
+                ? "✅ Troca realizada entre " + trade.getProposerName()
+                    + " e " + trade.getResolvedWithPlayer()
+                : "❌ Troca cancelada por " + trade.getProposerName();
+            logArea.appendText(msg2 + "\n");
+            updateSidebar();
+            return;
+        }
+
+        if (iAmProposer) {
+            // Mostra para o proponente quem aceitou, recusou ou está pendente
+            buildTradeProposerWaitingSidebar(trade);
+        } else if (trade.getResponses().containsKey(myName)) {
+            // Mostra para os outros o painel de aceitar/recusar
+            buildTradeResponderSidebar(trade, myName);
+        }
+    }
+
+    private void buildTradeProposerWaitingSidebar(
+            com.example.network.protocol.TradeStatusDTO trade) {
+
+        VBox box = new VBox(10);
+        box.setStyle("-fx-padding: 14; -fx-background-color: #1a2538;");
+
+        Label title = new Label("Aguardando respostas...");
+        title.setStyle("-fx-text-fill: #f1c40f; -fx-font-size: 14px; -fx-font-weight: bold;");
+        box.getChildren().add(title);
+
+        // Resumo da oferta
+        Label offerLabel = new Label("Você oferece: " + trade.getGive()
+            + "\nVocê quer: " + trade.getWant());
+        offerLabel.setStyle("-fx-text-fill: #bdc3c7; -fx-font-size: 12px; -fx-wrap-text: true;");
+        box.getChildren().add(offerLabel);
+
+        // Status de cada jogador + botão para confirmar quem aceitou
+        for (Map.Entry<String, String> entry : trade.getResponses().entrySet()) {
+            String name = entry.getKey();
+            String status = entry.getValue();
+
+            HBox row = new HBox(8);
+            row.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+            row.setStyle("-fx-padding: 6 10; -fx-background-color: #1e2d3e;" +
+                         "-fx-background-radius: 6;");
+
+            String icon = switch (status) {
+                case "ACCEPTED" -> "✅";
+                case "DECLINED" -> "❌";
+                default         -> "⏳";
+            };
+            Label statusLabel = new Label(icon + "  " + name);
+            statusLabel.setStyle("-fx-text-fill: white; -fx-font-size: 13px;");
+            row.getChildren().add(statusLabel);
+
+            if ("ACCEPTED".equals(status)) {
+                javafx.scene.layout.Region sp = new javafx.scene.layout.Region();
+                HBox.setHgrow(sp, javafx.scene.layout.Priority.ALWAYS);
+                Button confirmBtn = new Button("Fechar");
+                confirmBtn.setStyle("-fx-background-color: #27ae60; -fx-text-fill: white;" +
+                                    "-fx-font-weight: bold; -fx-cursor: hand;");
+                confirmBtn.setOnAction(e ->
+                    gameClient.sendIntent("CONFIRM_TRADE", name));
+                row.getChildren().addAll(sp, confirmBtn);
+            }
+            box.getChildren().add(row);
+        }
+
+        // Botão cancelar
+        Button cancelBtn = new Button("Cancelar proposta");
+        cancelBtn.setStyle("-fx-background-color: #c0392b; -fx-text-fill: white;" +
+                           "-fx-font-weight: bold; -fx-cursor: hand; -fx-padding: 8 14;");
+        cancelBtn.setOnAction(e -> gameClient.sendIntent("CANCEL_TRADE", null));
+        box.getChildren().add(cancelBtn);
+
+        rightSidebar.getChildren().add(box);
+    }
+
+    private void buildTradeResponderSidebar(
+            com.example.network.protocol.TradeStatusDTO trade, String myName) {
+
+        String myStatus = trade.getResponses().getOrDefault(myName, "PENDING");
+
+        VBox box = new VBox(10);
+        box.setStyle("-fx-padding: 14; -fx-background-color: #1a2538;");
+
+        Label title = new Label(trade.getProposerName() + " propôs uma troca:");
+        title.setStyle("-fx-text-fill: #f1c40f; -fx-font-size: 14px; -fx-font-weight: bold;");
+
+        Label offerLabel = new Label("Ele oferece: " + trade.getGive()
+            + "\nEle quer: " + trade.getWant());
+        offerLabel.setStyle("-fx-text-fill: #bdc3c7; -fx-font-size: 12px;" +
+                            "-fx-wrap-text: true;");
+
+        box.getChildren().addAll(title, offerLabel);
+
+        if ("PENDING".equals(myStatus)) {
+            HBox btns = new HBox(10);
+            btns.setAlignment(javafx.geometry.Pos.CENTER);
+
+            Button acceptBtn = new Button("✅ Aceitar");
+            acceptBtn.setStyle("-fx-background-color: #27ae60; -fx-text-fill: white;" +
+                               "-fx-font-weight: bold; -fx-cursor: hand; -fx-padding: 8 16;");
+            acceptBtn.setOnAction(e -> gameClient.sendIntent("TRADE_RESPONSE", "true"));
+
+            Button declineBtn = new Button("❌ Recusar");
+            declineBtn.setStyle("-fx-background-color: #c0392b; -fx-text-fill: white;" +
+                                "-fx-font-weight: bold; -fx-cursor: hand; -fx-padding: 8 16;");
+            declineBtn.setOnAction(e -> gameClient.sendIntent("TRADE_RESPONSE", "false"));
+
+            btns.getChildren().addAll(acceptBtn, declineBtn);
+            box.getChildren().add(btns);
+        } else {
+            Label replied = new Label("ACCEPTED".equals(myStatus)
+                ? "✅ Você aceitou — aguardando o proponente confirmar"
+                : "❌ Você recusou");
+            replied.setStyle("-fx-text-fill: #7f8c8d; -fx-font-size: 12px;");
+            box.getChildren().add(replied);
+        }
+
+        rightSidebar.getChildren().add(box);
+    }
+
     private void buildDiscardSidebar(Player player, WaitingDiscardState state) {
         int requiredAmount = player.getWallet().getTotalCards() / 2;
         Map<ResourceType, Integer> selection = new HashMap<>();
@@ -1550,7 +1853,22 @@ public class Main extends Application {
         confirmBtn.setOnAction(e -> {
             int totalSelected = selection.values().stream().mapToInt(Integer::intValue).sum();
             if (totalSelected == requiredAmount) {
-                state.submitDiscard(player, selection, gameManager.getCurrentTurn());
+                if (online) {
+                    // Monta o JSON dos recursos a descartar e envia ao servidor
+                    try {
+                        Map<String, Integer> rawMap = new HashMap<>();
+                        for (Map.Entry<ResourceType, Integer> ent : selection.entrySet()) {
+                            rawMap.put(ent.getKey().name(), ent.getValue());
+                        }
+                        String json = new com.fasterxml.jackson.databind.ObjectMapper()
+                            .writeValueAsString(rawMap);
+                        gameClient.sendIntent("SUBMIT_DISCARD", json);
+                    } catch (Exception ex) {
+                        ex.printStackTrace();
+                    }
+                } else {
+                    state.submitDiscard(player, selection, gameManager.getCurrentTurn());
+                }
                 updateSidebar();
             }
         });
@@ -1568,8 +1886,12 @@ public class Main extends Application {
             Button btn = new Button("Roubar de " + victim.getName());
             btn.setStyle("-fx-font-weight: bold; -fx-min-width: 200px;");
             btn.setOnAction(e -> {
-                state.executeSteal(victim, gameManager.getCurrentTurn());
-                updateActionUI.run();
+                if (online) {
+                    gameClient.sendIntent("STEAL_FROM", victim.getName());
+                } else {
+                    state.executeSteal(victim, gameManager.getCurrentTurn());
+                    updateActionUI.run();
+                }
             });
             rightSidebar.getChildren().add(btn);
         }

@@ -18,6 +18,36 @@ public final class MessageType {
     public static final String SET_READY    = "SET_READY";    // data: ready (boolean)
     public static final String START_GAME   = "START_GAME";   // host inicia a partida
     public static final String GAME_ACTION  = "GAME_ACTION";  // data: action, targetId (jogada in-game)
+    public static final String SUBMIT_DISCARD  = "SUBMIT_DISCARD";
+    // data: resources (Map<String,Integer> com quantidades a descartar)
+
+    public static final String PROPOSE_TRADE  = "PROPOSE_TRADE";
+    // data: offer (Map com "give" e "want", cada um Map<String,Integer>)
+
+    public static final String TRADE_RESPONSE = "TRADE_RESPONSE";
+    // data: accept (boolean) — enviado pelos não-proponentes
+
+    public static final String CONFIRM_TRADE  = "CONFIRM_TRADE";
+    // data: partnerName (String) — proponente fecha com quem aceitou
+
+    public static final String CANCEL_TRADE   = "CANCEL_TRADE";
+    // sem data — proponente cancela a proposta
+
+    public static final String BANK_TRADE    = "BANK_TRADE";
+    // data no targetId: JSON {"give":{"WOOD":4},"receive":"ORE"}
+
+    public static final String MOVE_ROBBER   = "MOVE_ROBBER";
+    // targetId: tileId (String) do tile onde o ladrão vai
+
+    public static final String STEAL_FROM    = "STEAL_FROM";
+    // targetId: nome do jogador a ser roubado (String)
+
+    public static final String PLAY_KNIGHT   = "PLAY_KNIGHT";
+    public static final String PLAY_MONOPOLY = "PLAY_MONOPOLY";
+    // targetId: recurso escolhido (ex: "WOOD")
+    public static final String PLAY_YEAR_OF_PLENTY = "PLAY_YEAR_OF_PLENTY";
+    // targetId: JSON {"res1":"WOOD","res2":"ORE"}
+    public static final String PLAY_ROAD_BUILDING  = "PLAY_ROAD_BUILDING";
 
     // ----- Servidor -> Cliente -----
     public static final String ROOM_LIST    = "ROOM_LIST";    // data: rooms (List<RoomInfo>)
@@ -28,4 +58,11 @@ public final class MessageType {
     public static final String GAME_STATE   = "GAME_STATE";   // data: state (GameStateDTO) -> estado autoritativo
     public static final String GAME_EVENT   = "GAME_EVENT";   // data: message -> linha de log do jogo
     public static final String ERROR        = "ERROR";        // data: message
+    public static final String DISCARD_REQUIRED = "DISCARD_REQUIRED";
+    // data: players (List<String> com nomes de quem precisa descartar)
+    public static final String DISCARD_WAITING  = "DISCARD_WAITING";
+    // data: remaining (List<String> com nomes de quem ainda não submeteu)
+
+    public static final String TRADE_UPDATE   = "TRADE_UPDATE";
+    // data: trade (TradeStatusDTO) — broadcast do estado atual da negociação
 }

@@ -31,6 +31,13 @@ public class GameStateDTO {
     private List<BuildingDTO> roads = new ArrayList<>();      // estradas (por edgeId)
     private Map<String, Integer> bank = new HashMap<>();      // recursos do banco
 
+    private List<String> discardPendingPlayers = new ArrayList<>();
+    // nomes dos jogadores que ainda precisam descartar (estado visível a todos)
+
+    private Map<String, Integer> discardAmounts = new HashMap<>();
+    // nome do jogador -> quantidade que ele DEVE descartar (público)
+    // o QUE ele vai descartar permanece secreto até todos submeterem
+
     public String getCurrentPlayerName() { return currentPlayerName; }
     public void setCurrentPlayerName(String v) { this.currentPlayerName = v; }
 
@@ -72,4 +79,16 @@ public class GameStateDTO {
 
     public Map<String, Integer> getBank() { return bank; }
     public void setBank(Map<String, Integer> v) { this.bank = v == null ? new HashMap<>() : v; }
+
+    public List<String> getDiscardPendingPlayers() { return discardPendingPlayers; }
+    public void setDiscardPendingPlayers(List<String> v) { this.discardPendingPlayers = v == null ? new ArrayList<>() : v; }
+
+    public Map<String, Integer> getDiscardAmounts() { return discardAmounts; }
+    public void setDiscardAmounts(Map<String, Integer> v) { this.discardAmounts = v == null ? new HashMap<>() : v; }
+
+    private TradeStatusDTO activeTrade;
+    // null quando não há troca em andamento
+
+    public TradeStatusDTO getActiveTrade() { return activeTrade; }
+    public void setActiveTrade(TradeStatusDTO v) { this.activeTrade = v; }
 }
