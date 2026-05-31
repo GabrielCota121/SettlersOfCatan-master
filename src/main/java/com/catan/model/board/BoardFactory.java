@@ -109,9 +109,7 @@ public class BoardFactory {
             }
         }
 
-        // 4. Fallback de Segurança:
-        // Se as regras de espaçamento ali em cima forem muito duras e não derem conta de posicionar todos os 9,
-        // esse bloco de emergência garante que o resto da lista seja colocado no mar em arestas vazias.
+        // 4. Fallback de Segurança
         if (portsPlaced < 9) {
             for (Edge edge : coastalEdges) {
                 if (portsPlaced >= 9) break;

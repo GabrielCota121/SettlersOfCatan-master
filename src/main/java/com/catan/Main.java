@@ -1156,8 +1156,8 @@ public class Main extends Application {
                     gc.save();
                     gc.translate(v1.getX(), v1.getY());
                     gc.rotate(angle1);
-                    gc.translate(0, 15); // Mover ainda mais para trás (15px)
-                    double scale = 0.55; // Aumentado em 5% conforme solicitado
+                    gc.translate(0, 15);
+                    double scale = 0.55;
                     gc.drawImage(dImg, - (dImg.getWidth() * scale) / 2.0, 0, dImg.getWidth() * scale, dImg.getHeight() * scale);
                     gc.restore();
 
@@ -1166,7 +1166,7 @@ public class Main extends Application {
                     gc.save();
                     gc.translate(v2.getX(), v2.getY());
                     gc.rotate(angle2);
-                    gc.translate(0, 15); // Mover ainda mais para trás
+                    gc.translate(0, 15);
                     gc.drawImage(dImg, - (dImg.getWidth() * scale) / 2.0, 0, dImg.getWidth() * scale, dImg.getHeight() * scale);
                     gc.restore();
                 }
