@@ -1,0 +1,13 @@
+package com.example.model.logging;
+
+public class WebSocketLogger implements IGameLogger {
+    @Override
+    public void log(String message) {
+        //TODO só deixei pronto essa carniça
+    }
+
+    @Override
+    public void error(String message) {
+        System.err.println("[ERRO] " + message);
+    }
+}

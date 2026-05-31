@@ -1,0 +1,31 @@
+package com.example.network.protocol;
+
+/**
+ * Tipos de mensagem do protocolo WebSocket do Catan.
+ *
+ * Mantido como constantes String (em vez de enum) para que cliente e servidor
+ * possam evoluir de forma independente sem quebrar a desserialização do JSON.
+ */
+public final class MessageType {
+
+    private MessageType() {}
+
+    // ----- Cliente -> Servidor -----
+    public static final String LIST_ROOMS   = "LIST_ROOMS";   // pede a lista de salas
+    public static final String CREATE_ROOM  = "CREATE_ROOM";  // data: roomName, maxPlayers, color
+    public static final String JOIN_ROOM    = "JOIN_ROOM";    // roomId; data: color
+    public static final String LEAVE_ROOM   = "LEAVE_ROOM";   // sai da sala atual
+    public static final String SET_READY    = "SET_READY";    // data: ready (boolean)
+    public static final String START_GAME   = "START_GAME";   // host inicia a partida
+    public static final String GAME_ACTION  = "GAME_ACTION";  // data: action, targetId (jogada in-game)
+
+    // ----- Servidor -> Cliente -----
+    public static final String ROOM_LIST    = "ROOM_LIST";    // data: rooms (List<RoomInfo>)
+    public static final String ROOM_JOINED  = "ROOM_JOINED";  // data: room (RoomInfo) -> você entrou
+    public static final String ROOM_UPDATE  = "ROOM_UPDATE";  // data: room (RoomInfo) -> algo mudou na sala
+    public static final String ROOM_LEFT    = "ROOM_LEFT";    // confirmação de saída
+    public static final String GAME_STARTED = "GAME_STARTED"; // data: room (RoomInfo), seed -> partida começou
+    public static final String GAME_STATE   = "GAME_STATE";   // data: state (GameStateDTO) -> estado autoritativo
+    public static final String GAME_EVENT   = "GAME_EVENT";   // data: message -> linha de log do jogo
+    public static final String ERROR        = "ERROR";        // data: message
+}
