@@ -1,8 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(cd /d/SettlersOfCatan && find . -type f \\\\\\( -name \"*.java\" -o -name \"pom.xml\" -o -name \"build.gradle\" -o -name \"*.fxml\" -o -name \"application.properties\" \\\\\\) 2>/dev/null | head -200)",
-      "Read(//d/SettlersOfCatan/**)"
-    ]
-  }
-}
