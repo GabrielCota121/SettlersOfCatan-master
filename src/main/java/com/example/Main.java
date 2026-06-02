@@ -417,6 +417,11 @@ public class Main extends Application {
                     }
 
                     cardView.setOnMouseClicked(e -> {
+                        if (card instanceof VictoryPointCard) {
+                            gameManager.getLogger().log(
+                                "A carta de Ponto de Vitória já vale 1 ponto automaticamente.");
+                            return;
+                        }
                         if (!canPlay) {
                             if (online && !isMyTurn) {
                                 gameManager.getLogger().log(
@@ -903,20 +908,26 @@ public class Main extends Application {
                 .filter(java.util.Objects::nonNull)
                 .collect(java.util.stream.Collectors.toList());
 
-            if (!(gameManager.getCurrentTurn().getState() instanceof WaitingDiscardState)) {
-                gameManager.getCurrentTurn().setState(new WaitingDiscardState(pending));
-            }
+            // SEMPRE recria o estado com a lista ATUAL de pendentes do servidor
+            // (não usa o "if not instanceof" — o estado precisa refletir quem
+            // ainda falta a cada snapshot).
+            gameManager.getCurrentTurn().setState(new WaitingDiscardState(pending));
         }
 
-        // Quando o servidor confirma MoveRobberState, mostra sidebar
-        // de escolha de vítima se houver candidatos
-        if (state.getStateName() != null &&
-                state.getStateName().contains("Robber") &&
-                online && myPlayer != null &&
-                myPlayer.getName().equals(state.getCurrentPlayerName())) {
-            // É o jogador local quem move o ladrão — nada a fazer aqui,
-            // o clique já mandou MOVE_ROBBER. Sidebar de vítima será
-            // tratada pelo próximo GAME_STATE após o servidor processar.
+        // Ladrão: se o servidor informou vítimas possíveis e EU sou o
+        // jogador da vez, mostro a sidebar de escolha de vítima.
+        if (state.getRobberVictims() != null
+                && !state.getRobberVictims().isEmpty()
+                && online && myPlayer != null
+                && myPlayer.getName().equals(state.getCurrentPlayerName())) {
+            List<Player> victims = state.getRobberVictims().stream()
+                .map(byName::get)
+                .filter(java.util.Objects::nonNull)
+                .collect(java.util.stream.Collectors.toList());
+            if (!victims.isEmpty()) {
+                javafx.application.Platform.runLater(() ->
+                    buildStealVictimSidebarOnline(victims));
+            }
         }
 
         // Construções: limpa e reconstrói a partir do snapshot.
@@ -979,6 +990,14 @@ public class Main extends Application {
                     } else {
                         p.addNewCard(c); // comprada neste turno
                     }
+                }
+            }
+            if (ps.getTradeRates() != null) {
+                for (Map.Entry<String, Integer> en : ps.getTradeRates().entrySet()) {
+                    try {
+                        ResourceType rt = ResourceType.valueOf(en.getKey());
+                        p.setTradeRate(rt, en.getValue());
+                    } catch (IllegalArgumentException ignored) {}
                 }
             }
         }
@@ -1056,7 +1075,16 @@ public class Main extends Application {
 
         if (state instanceof WaitingDiscardState discardState) {
             List<Player> pending = discardState.getPendingPlayers();
-            if (!pending.isEmpty()) {
+            // Em online: só mostra o descarte SE o jogador local ainda
+            // precisa descartar. Senão, mostra tela de espera.
+            if (online && myPlayer != null) {
+                if (pending.contains(myPlayer)) {
+                    buildDiscardSidebar(myPlayer, discardState);
+                } else {
+                    buildDiscardWaitingSidebar(pending);
+                }
+            } else if (!pending.isEmpty()) {
+                // Offline: mostra o primeiro pendente (comportamento local)
                 buildDiscardSidebar(pending.get(0), discardState);
             }
         } else if (state instanceof PlayerTradeState tradeState) {
@@ -2148,7 +2176,6 @@ public class Main extends Application {
             int totalSelected = selection.values().stream().mapToInt(Integer::intValue).sum();
             if (totalSelected == requiredAmount) {
                 if (online) {
-                    // Monta o JSON dos recursos a descartar e envia ao servidor
                     try {
                         Map<String, Integer> rawMap = new HashMap<>();
                         for (Map.Entry<ResourceType, Integer> ent : selection.entrySet()) {
@@ -2157,17 +2184,43 @@ public class Main extends Application {
                         String json = new com.fasterxml.jackson.databind.ObjectMapper()
                             .writeValueAsString(rawMap);
                         gameClient.sendIntent("SUBMIT_DISCARD", json);
+                        // NÃO chama updateSidebar aqui — espera o servidor responder
+                        // com GAME_STATE. Mostra tela de espera enquanto isso.
+                        buildDiscardWaitingSidebar(java.util.List.of());
                     } catch (Exception ex) {
                         ex.printStackTrace();
                     }
                 } else {
                     state.submitDiscard(player, selection, gameManager.getCurrentTurn());
+                    updateSidebar();
                 }
-                updateSidebar();
             }
         });
 
         rightSidebar.getChildren().addAll(titleLabel, countLabel, resourcesBox, confirmBtn);
+    }
+
+    private void buildDiscardWaitingSidebar(List<Player> pending) {
+        rightSidebar.getChildren().clear();
+
+        Label title = new Label("Aguardando descartes");
+        title.setStyle("-fx-text-fill: white; -fx-font-size: 18px;"
+            + "-fx-font-weight: bold;");
+
+        Label info;
+        if (pending == null || pending.isEmpty()) {
+            info = new Label("Você já escolheu suas cartas.\n"
+                + "Aguardando os outros jogadores...");
+        } else {
+            String nomes = pending.stream()
+                .map(Player::getName)
+                .collect(java.util.stream.Collectors.joining(", "));
+            info = new Label("Ainda falta descartar:\n" + nomes);
+        }
+        info.setStyle("-fx-text-fill: #e67e22; -fx-font-size: 13px;"
+            + "-fx-text-alignment: center;");
+
+        rightSidebar.getChildren().addAll(title, info);
     }
 
     private void buildStealVictimSidebar(List<Player> victims, MoveRobberState state, Runnable updateActionUI) {
@@ -2187,6 +2240,24 @@ public class Main extends Application {
                     updateActionUI.run();
                 }
             });
+            rightSidebar.getChildren().add(btn);
+        }
+    }
+
+    private void buildStealVictimSidebarOnline(List<Player> victims) {
+        rightSidebar.getChildren().clear();
+        Label title = new Label("Escolha quem roubar:");
+        title.setStyle("-fx-text-fill: white; -fx-font-size: 16px;"
+            + "-fx-font-weight: bold;");
+        rightSidebar.getChildren().add(title);
+
+        for (Player victim : victims) {
+            Button btn = new Button(victim.getName()
+                + " (" + victim.getWallet().getTotalCards() + " cartas)");
+            btn.setStyle("-fx-background-color: #c0392b; -fx-text-fill: white;"
+                + "-fx-font-weight: bold; -fx-padding: 8 14; -fx-cursor: hand;");
+            btn.setOnAction(e ->
+                gameClient.sendIntent("STEAL_FROM", victim.getName()));
             rightSidebar.getChildren().add(btn);
         }
     }

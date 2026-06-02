@@ -207,12 +207,35 @@ public class GameSession {
                                 + e.getValue() + " " + e.getKey() + ")");
                             // Marca como DECLINED automaticamente
                             activeTrade.getResponses().put(senderName, "DECLINED");
+
+                            if (activeTrade.getResponses().values().stream().noneMatch("PENDING"::equals)
+                                    && activeTrade.getResponses().values().stream().noneMatch("ACCEPTED"::equals)) {
+                                manager.getLogger().log("Todos recusaram a troca de "
+                                    + activeTrade.getProposerName() + ".");
+                                activeTrade.setActive(false);
+                                activeTrade.setResolvedWithPlayer(null);
+                                lastResolvedTrade = activeTrade;
+                                activeTrade = null;
+                            }
                             return true; // resposta registrada (como recusa)
                         }
                     }
                 }
                 activeTrade.getResponses().put(senderName,
                     accepts ? "ACCEPTED" : "DECLINED");
+                // Se TODOS os não-proponentes recusaram, encerra a troca
+                boolean todosResponderam = activeTrade.getResponses().values().stream()
+                    .noneMatch("PENDING"::equals);
+                boolean alguemAceitou = activeTrade.getResponses().values().stream()
+                    .anyMatch("ACCEPTED"::equals);
+                if (todosResponderam && !alguemAceitou) {
+                    manager.getLogger().log("Todos recusaram a troca de "
+                        + activeTrade.getProposerName() + ".");
+                    activeTrade.setActive(false);
+                    activeTrade.setResolvedWithPlayer(null);
+                    lastResolvedTrade = activeTrade;
+                    activeTrade = null;
+                }
                 return true;
             }
 
@@ -578,6 +601,11 @@ public class GameSession {
         if (robber != null && robber.getCurrentTile() != null) {
             dto.setRobberTileId(robber.getCurrentTile().getId());
         }
+        if (pendingRobberVictims != null && !pendingRobberVictims.isEmpty()) {
+            java.util.List<String> names = new java.util.ArrayList<>();
+            for (Player p : pendingRobberVictims) names.add(p.getName());
+            dto.setRobberVictims(names);
+        }
 
         int totalSettlements = 0;
         List<PlayerStateDTO> playerDtos = new ArrayList<>();
@@ -605,6 +633,12 @@ public class GameSession {
             if (p.getNewCards()      != null) totalCards += p.getNewCards().size();
             ps.setNumDevCardsTotal(totalCards);
 
+            Map<String, Integer> rates = new HashMap<>();
+            for (Map.Entry<ResourceType, Integer> en : p.getTradeRates().entrySet()) {
+                rates.put(en.getKey().name(), en.getValue());
+            }
+            ps.setTradeRates(rates);
+
             boolean isViewer = (viewerName == null || viewerName.equals(p.getName()));
             ps.setHiddenResources(!isViewer);
 
@@ -621,7 +655,9 @@ public class GameSession {
                 if (p.getPlayableCards() != null) {
                     for (IDevelopmentCard c : p.getPlayableCards()) {
                         allCards.add(c.getName());
-                        playable.add(c.getName());
+                        if (!(c instanceof com.example.model.cards.VictoryPointCard)) {
+                            playable.add(c.getName());
+                        }
                     }
                 }
                 if (p.getNewCards() != null) {

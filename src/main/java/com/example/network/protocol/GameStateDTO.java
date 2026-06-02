@@ -86,6 +86,12 @@ public class GameStateDTO {
     public Map<String, Integer> getDiscardAmounts() { return discardAmounts; }
     public void setDiscardAmounts(Map<String, Integer> v) { this.discardAmounts = v == null ? new HashMap<>() : v; }
 
+    private java.util.List<String> robberVictims = new java.util.ArrayList<>();
+    public java.util.List<String> getRobberVictims() { return robberVictims; }
+    public void setRobberVictims(java.util.List<String> v) {
+        this.robberVictims = v == null ? new java.util.ArrayList<>() : v;
+    }
+
     private TradeStatusDTO activeTrade;
     // null quando não há troca em andamento
 

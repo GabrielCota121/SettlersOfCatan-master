@@ -17,6 +17,6 @@ public class VictoryPointCard implements IDevelopmentCard {
     @Override
     public void onPurchase(Player player) {
         player.incrementVictoryPoints();
-        player.addPlayableCard(this); // fica visível mas não é "jogável"
+        player.addNewCard(this); // visível, ponto já contado, nunca jogável manualmente
     }
 }

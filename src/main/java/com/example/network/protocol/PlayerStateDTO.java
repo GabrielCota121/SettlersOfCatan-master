@@ -72,4 +72,10 @@ public class PlayerStateDTO {
 
     public int getNumDevCardsTotal() { return numDevCardsTotal; }
     public void setNumDevCardsTotal(int v) { this.numDevCardsTotal = v; }
+
+    private Map<String, Integer> tradeRates = new HashMap<>();
+    public Map<String, Integer> getTradeRates() { return tradeRates; }
+    public void setTradeRates(Map<String, Integer> v) {
+        this.tradeRates = v == null ? new HashMap<>() : v;
+    }
 }
