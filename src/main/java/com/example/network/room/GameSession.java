@@ -43,6 +43,12 @@ public class GameSession {
     // Estado da negociação em andamento (null = nenhuma)
     private com.example.network.protocol.TradeStatusDTO activeTrade = null;
 
+    // Último trade resolvido/cancelado — enviado uma vez só pelo handler
+    private com.example.network.protocol.TradeStatusDTO lastResolvedTrade = null;
+
+    // Vítimas possíveis após MOVE_ROBBER, aguardando STEAL_FROM
+    private java.util.List<Player> pendingRobberVictims = null;
+
     public GameSession(List<RoomPlayer> roomPlayers, long seed, Consumer<String> logSink) {
         this.seed = seed;
 
@@ -128,7 +134,6 @@ public class GameSession {
                 return e != null && state.buildRoad(e, turn);
             }
             case "PROPOSE_TRADE": {
-                // targetId carrega JSON: {"give":{"WOOD":1},"want":{"ORE":2}}
                 if (targetId == null) return false;
                 try {
                     com.fasterxml.jackson.databind.ObjectMapper om =
@@ -136,70 +141,146 @@ public class GameSession {
                     @SuppressWarnings("unchecked")
                     Map<String, Object> payload = om.readValue(targetId, Map.class);
                     @SuppressWarnings("unchecked")
-                    Map<String, Integer> give = (Map<String, Integer>) payload.get("give");
+                    Map<String, Integer> give =
+                        (Map<String, Integer>) payload.get("give");
                     @SuppressWarnings("unchecked")
-                    Map<String, Integer> want = (Map<String, Integer>) payload.get("want");
+                    Map<String, Integer> want =
+                        (Map<String, Integer>) payload.get("want");
                     if (give == null || want == null) return false;
+                    if (give.isEmpty() || want.isEmpty()) {
+                        manager.getLogger().log(
+                            "Troca inválida: precisa dar e pedir ao menos 1 recurso.");
+                        return false;
+                    }
+
+                    // REGRA: não pode pedir o mesmo recurso que está dando
+                    for (String k : give.keySet()) {
+                        if (want.containsKey(k) && give.get(k) > 0 && want.get(k) > 0) {
+                            manager.getLogger().log(
+                                "Troca inválida: não pode pedir o mesmo recurso "
+                                + "que está oferecendo (" + k + ").");
+                            return false;
+                        }
+                    }
+
+                    // Proponente precisa ter o que oferece
+                    for (Map.Entry<String, Integer> e : give.entrySet()) {
+                        com.example.model.game.ResourceType rt =
+                            com.example.model.game.ResourceType.valueOf(e.getKey());
+                        if (current.getWallet().getResourceAmount(rt) < e.getValue()) {
+                            manager.getLogger().log(
+                                "Troca inválida: você não tem " + e.getValue()
+                                + " " + e.getKey());
+                            return false;
+                        }
+                    }
+
                     activeTrade = buildTradeStatus(senderName, give, want);
                     return true;
                 } catch (Exception e) {
-                    System.out.println("Erro ao deserializar PROPOSE_TRADE: " + e.getMessage());
+                    System.out.println("Erro PROPOSE_TRADE: " + e.getMessage());
                     return false;
                 }
             }
 
             case "TRADE_RESPONSE": {
-                // Qualquer jogador (exceto o proponente) pode responder
                 if (activeTrade == null || !activeTrade.isActive()) return false;
                 if (activeTrade.getProposerName().equals(senderName)) return false;
                 if (!activeTrade.getResponses().containsKey(senderName)) return false;
-                // targetId = "true" ou "false"
+
                 boolean accepts = "true".equalsIgnoreCase(targetId);
-                activeTrade.getResponses().put(senderName, accepts ? "ACCEPTED" : "DECLINED");
+
+                if (accepts) {
+                    // Valida que o respondedor TEM os recursos que o proponente quer
+                    com.example.model.player.Player responder = manager.getPlayers()
+                        .stream().filter(p -> p.getName().equals(senderName))
+                        .findFirst().orElse(null);
+                    if (responder == null) return false;
+                    for (Map.Entry<String, Integer> e :
+                            activeTrade.getWant().entrySet()) {
+                        com.example.model.game.ResourceType rt =
+                            com.example.model.game.ResourceType.valueOf(e.getKey());
+                        if (responder.getWallet().getResourceAmount(rt)
+                                < e.getValue()) {
+                            manager.getLogger().log(senderName
+                                + " não tem recursos para aceitar (precisa de "
+                                + e.getValue() + " " + e.getKey() + ")");
+                            // Marca como DECLINED automaticamente
+                            activeTrade.getResponses().put(senderName, "DECLINED");
+                            return true; // resposta registrada (como recusa)
+                        }
+                    }
+                }
+                activeTrade.getResponses().put(senderName,
+                    accepts ? "ACCEPTED" : "DECLINED");
                 return true;
             }
 
             case "CONFIRM_TRADE": {
-                // Só o proponente confirma; targetId = nome do parceiro escolhido
                 if (activeTrade == null || !activeTrade.isActive()) return false;
                 if (!activeTrade.getProposerName().equals(senderName)) return false;
                 String partner = targetId;
                 if (partner == null) return false;
-                if (!"ACCEPTED".equals(activeTrade.getResponses().get(partner))) return false;
+                if (!"ACCEPTED".equals(activeTrade.getResponses().get(partner)))
+                    return false;
 
-                // Executa a troca no modelo
-                com.example.model.player.Player proposer = manager.getPlayers().stream()
-                    .filter(p -> p.getName().equals(senderName)).findFirst().orElse(null);
-                com.example.model.player.Player partnerPlayer = manager.getPlayers().stream()
-                    .filter(p -> p.getName().equals(partner)).findFirst().orElse(null);
+                com.example.model.player.Player proposer = manager.getPlayers()
+                    .stream().filter(p -> p.getName().equals(senderName))
+                    .findFirst().orElse(null);
+                com.example.model.player.Player partnerPlayer = manager.getPlayers()
+                    .stream().filter(p -> p.getName().equals(partner))
+                    .findFirst().orElse(null);
                 if (proposer == null || partnerPlayer == null) return false;
 
-                // Transfere recursos: proponente dá, recebe
+                // VALIDAÇÃO PRÉVIA: ambos precisam ter os recursos ANTES de mover
                 for (Map.Entry<String, Integer> e : activeTrade.getGive().entrySet()) {
-                    try {
-                        com.example.model.game.ResourceType rt =
-                            com.example.model.game.ResourceType.valueOf(e.getKey());
-                        proposer.getWallet().removeResource(rt, e.getValue());
-                        partnerPlayer.getWallet().addResource(rt, e.getValue());
-                    } catch (IllegalArgumentException ignored) {}
-                }
-                for (Map.Entry<String, Integer> e : activeTrade.getWant().entrySet()) {
-                    try {
-                        com.example.model.game.ResourceType rt =
-                            com.example.model.game.ResourceType.valueOf(e.getKey());
-                        partnerPlayer.getWallet().removeResource(rt, e.getValue());
-                        proposer.getWallet().addResource(rt, e.getValue());
-                    } catch (IllegalArgumentException ignored) {}
-                }
-
-                // Marca todos os pendentes e não-escolhidos como DECLINED
-                for (String name : activeTrade.getResponses().keySet()) {
-                    if (!name.equals(partner)) {
-                        activeTrade.getResponses().put(name, "DECLINED");
+                    com.example.model.game.ResourceType rt =
+                        com.example.model.game.ResourceType.valueOf(e.getKey());
+                    if (proposer.getWallet().getResourceAmount(rt) < e.getValue()) {
+                        manager.getLogger().log("Troca cancelada: " + senderName
+                            + " não tem " + e.getValue() + " " + e.getKey());
+                        // Recusa a troca e limpa
+                        activeTrade.setActive(false);
+                        lastResolvedTrade = activeTrade;
+                        activeTrade = null;
+                        return false;
                     }
                 }
+                for (Map.Entry<String, Integer> e : activeTrade.getWant().entrySet()) {
+                    com.example.model.game.ResourceType rt =
+                        com.example.model.game.ResourceType.valueOf(e.getKey());
+                    if (partnerPlayer.getWallet().getResourceAmount(rt) < e.getValue()) {
+                        manager.getLogger().log("Troca cancelada: " + partner
+                            + " não tem " + e.getValue() + " " + e.getKey());
+                        activeTrade.setActive(false);
+                        lastResolvedTrade = activeTrade;
+                        activeTrade = null;
+                        return false;
+                    }
+                }
+
+                // Agora executa com segurança (todos têm os recursos)
+                for (Map.Entry<String, Integer> e : activeTrade.getGive().entrySet()) {
+                    com.example.model.game.ResourceType rt =
+                        com.example.model.game.ResourceType.valueOf(e.getKey());
+                    proposer.getWallet().removeResource(rt, e.getValue());
+                    partnerPlayer.getWallet().addResource(rt, e.getValue());
+                }
+                for (Map.Entry<String, Integer> e : activeTrade.getWant().entrySet()) {
+                    com.example.model.game.ResourceType rt =
+                        com.example.model.game.ResourceType.valueOf(e.getKey());
+                    partnerPlayer.getWallet().removeResource(rt, e.getValue());
+                    proposer.getWallet().addResource(rt, e.getValue());
+                }
+
+                manager.getLogger().log("Troca: " + senderName + " deu "
+                    + activeTrade.getGive() + " e recebeu " + activeTrade.getWant()
+                    + " de " + partner);
+
                 activeTrade.setActive(false);
                 activeTrade.setResolvedWithPlayer(partner);
+                lastResolvedTrade = activeTrade;  // envia uma vez pro cliente fechar
+                activeTrade = null;               // LIMPA — corrige troca fantasma
                 return true;
             }
 
@@ -207,6 +288,7 @@ public class GameSession {
                 if (activeTrade == null) return false;
                 if (!activeTrade.getProposerName().equals(senderName)) return false;
                 activeTrade.setActive(false);
+                lastResolvedTrade = activeTrade;
                 activeTrade = null;
                 return true;
             }
@@ -219,31 +301,56 @@ public class GameSession {
                     @SuppressWarnings("unchecked")
                     Map<String, Object> payload = om.readValue(targetId, Map.class);
                     @SuppressWarnings("unchecked")
-                    Map<String, Integer> giveMap = (Map<String, Integer>) payload.get("give");
-                    String receiveStr = (String) payload.get("receive");
-                    if (giveMap == null || receiveStr == null) return false;
+                    Map<String, Integer> giveMap =
+                        (Map<String, Integer>) payload.get("give");
+                    // receive pode ser String (single, retrocompat) ou Map (múltiplo)
+                    Object receiveObj = payload.get("receive");
+                    if (giveMap == null || receiveObj == null) return false;
 
-                    com.example.model.game.ResourceType receive =
-                        com.example.model.game.ResourceType.valueOf(receiveStr);
+                    Map<String, Integer> receiveMap = new HashMap<>();
+                    if (receiveObj instanceof String) {
+                        receiveMap.put((String) receiveObj, 1);
+                    } else if (receiveObj instanceof Map) {
+                        @SuppressWarnings("unchecked")
+                        Map<String, Integer> rm = (Map<String, Integer>) receiveObj;
+                        receiveMap.putAll(rm);
+                    } else {
+                        return false;
+                    }
 
-                    // Valida e executa: remove os recursos dados e adiciona o recebido
                     com.example.model.player.Player player = manager.getPlayers().stream()
-                        .filter(p -> p.getName().equals(senderName)).findFirst().orElse(null);
+                        .filter(p -> p.getName().equals(senderName))
+                        .findFirst().orElse(null);
                     if (player == null) return false;
 
+                    // Valida proporção pelas tradeRates do jogador
+                    int allowedReceive = 0;
                     for (Map.Entry<String, Integer> e : giveMap.entrySet()) {
                         com.example.model.game.ResourceType rt =
                             com.example.model.game.ResourceType.valueOf(e.getKey());
-                        if (player.getWallet().getResourceAmount(rt) < e.getValue()) return false;
+                        int rate = player.getTradeRates().getOrDefault(rt, 4);
+                        if (e.getValue() % rate != 0) return false;
+                        allowedReceive += e.getValue() / rate;
+                        if (player.getWallet().getResourceAmount(rt) < e.getValue())
+                            return false;
                     }
+                    int totalReceive = receiveMap.values()
+                        .stream().mapToInt(Integer::intValue).sum();
+                    if (allowedReceive != totalReceive) return false;
+
+                    // Executa
                     for (Map.Entry<String, Integer> e : giveMap.entrySet()) {
                         com.example.model.game.ResourceType rt =
                             com.example.model.game.ResourceType.valueOf(e.getKey());
                         player.getWallet().removeResource(rt, e.getValue());
                         manager.getBank().getWallet().addResource(rt, e.getValue());
                     }
-                    player.getWallet().addResource(receive, 1);
-                    manager.getBank().getWallet().removeResource(receive, 1);
+                    for (Map.Entry<String, Integer> e : receiveMap.entrySet()) {
+                        com.example.model.game.ResourceType rt =
+                            com.example.model.game.ResourceType.valueOf(e.getKey());
+                        player.getWallet().addResource(rt, e.getValue());
+                        manager.getBank().getWallet().removeResource(rt, e.getValue());
+                    }
                     return true;
                 } catch (Exception e) {
                     System.out.println("Erro em BANK_TRADE: " + e.getMessage());
@@ -252,33 +359,116 @@ public class GameSession {
             }
 
             case "MOVE_ROBBER": {
-                // TODO: método moveRobber não existe em ITurnState — implementar futuramente
-                return false;
+                if (!(state instanceof com.example.model.state.MoveRobberState robberState))
+                    return false;
+                com.example.model.board.Tile tile = tileById.get(targetId);
+                if (tile == null) return false;
+                java.util.List<Player> victims = robberState.moveRobber(tile, turn);
+                if (victims == null) return false; // tile inválido (mesmo do atual)
+
+                // Guarda as vítimas possíveis para o STEAL_FROM seguinte
+                pendingRobberVictims = victims;
+
+                // Se não há vítimas, executa steal nulo (volta ao estado anterior)
+                if (victims.isEmpty()) {
+                    robberState.executeSteal(null, turn);
+                    pendingRobberVictims = null;
+                }
+                return true;
             }
 
             case "STEAL_FROM": {
-                // TODO: método stealFrom não existe em ITurnState — implementar futuramente
-                return false;
+                if (!(state instanceof com.example.model.state.MoveRobberState robberState))
+                    return false;
+                Player victim = manager.getPlayers().stream()
+                    .filter(p -> p.getName().equals(targetId))
+                    .findFirst().orElse(null);
+                // Valida que a vítima estava na lista permitida
+                if (pendingRobberVictims != null && victim != null
+                        && !pendingRobberVictims.contains(victim)) {
+                    return false;
+                }
+                robberState.executeSteal(victim, turn);
+                pendingRobberVictims = null;
+                return true;
             }
 
             case "PLAY_KNIGHT": {
-                // TODO: método playKnight não existe em ITurnState — implementar futuramente
-                return false;
+                com.example.model.cards.IDevelopmentCard knight =
+                    findPlayableCard(current, "Knight");
+                if (knight == null) return false;
+                return state.playDevelopmentCard(knight, turn);
             }
 
             case "PLAY_MONOPOLY": {
-                // TODO: método playMonopoly não existe em ITurnState — implementar futuramente
-                return false;
+                if (targetId == null) return false;
+                com.example.model.cards.IDevelopmentCard mono =
+                    findPlayableCard(current, "Monopoly");
+                if (mono == null) return false;
+                boolean played = state.playDevelopmentCard(mono, turn);
+                if (!played) return false;
+                // Após jogar, o estado vira MonopolyState — escolhe o recurso
+                com.example.model.state.ITurnState newState = turn.getState();
+                if (newState instanceof com.example.model.state.MonopolyState monoState) {
+                    try {
+                        com.example.model.game.ResourceType rt =
+                            com.example.model.game.ResourceType.valueOf(targetId);
+                        monoState.chooseResource(rt, turn);
+                    } catch (IllegalArgumentException e) { return false; }
+                }
+                return true;
             }
 
             case "PLAY_YEAR_OF_PLENTY": {
-                // TODO: método playYearOfPlenty não existe em ITurnState — implementar futuramente
-                return false;
+                if (targetId == null) return false;
+                com.example.model.cards.IDevelopmentCard yop =
+                    findPlayableCard(current, "Year of Plenty");
+                if (yop == null) return false;
+                boolean played = state.playDevelopmentCard(yop, turn);
+                if (!played) return false;
+                com.example.model.state.ITurnState newState = turn.getState();
+                if (newState instanceof com.example.model.state.YearOfPlentyState yopState) {
+                    try {
+                        com.fasterxml.jackson.databind.ObjectMapper om =
+                            new com.fasterxml.jackson.databind.ObjectMapper();
+                        @SuppressWarnings("unchecked")
+                        Map<String, String> payload = om.readValue(targetId, Map.class);
+                        com.example.model.game.ResourceType r1 =
+                            com.example.model.game.ResourceType.valueOf(payload.get("res1"));
+                        com.example.model.game.ResourceType r2 =
+                            com.example.model.game.ResourceType.valueOf(payload.get("res2"));
+                        yopState.chooseResources(r1, r2, turn);
+                    } catch (Exception e) { return false; }
+                }
+                return true;
             }
 
             case "PLAY_ROAD_BUILDING": {
-                // TODO: método playRoadBuilding não existe em ITurnState — implementar futuramente
-                return false;
+                com.example.model.cards.IDevelopmentCard rb =
+                    findPlayableCard(current, "Road Building");
+                if (rb == null) return false;
+                return state.playDevelopmentCard(rb, turn);
+            }
+
+            case "PLAY_VICTORY_POINT": {
+                com.example.model.state.ITurnState st =
+                    manager.getCurrentTurn().getState();
+                com.example.model.player.Player sender2 = manager.getPlayers()
+                    .stream().filter(p -> p.getName().equals(senderName))
+                    .findFirst().orElse(null);
+                if (sender2 == null) return false;
+                java.util.Optional<com.example.model.cards.IDevelopmentCard> vpCard =
+                    sender2.getPlayableCards().stream()
+                        .filter(c -> c instanceof com.example.model.cards.VictoryPointCard)
+                        .findFirst();
+                if (vpCard.isEmpty()) {
+                    vpCard = sender2.getNewCards().stream()
+                        .filter(c -> c instanceof com.example.model.cards.VictoryPointCard)
+                        .findFirst();
+                }
+                if (vpCard.isEmpty()) return false;
+                return st.playDevelopmentCard(vpCard.get(),
+                    manager.getCurrentTurn());
             }
 
             case "SUBMIT_DISCARD": {
@@ -316,6 +506,24 @@ public class GameSession {
             default:
                 return false;
         }
+    }
+
+    public com.example.network.protocol.TradeStatusDTO consumeLastResolvedTrade() {
+        com.example.network.protocol.TradeStatusDTO t = lastResolvedTrade;
+        lastResolvedTrade = null;
+        return t;
+    }
+
+    private com.example.model.cards.IDevelopmentCard findPlayableCard(
+            Player player, String cardName) {
+        for (com.example.model.cards.IDevelopmentCard c : player.getPlayableCards()) {
+            if (c.getName().equals(cardName)) return c;
+        }
+        // Também procura em newCards (algumas implementações deixam lá)
+        for (com.example.model.cards.IDevelopmentCard c : player.getNewCards()) {
+            if (c.getName().equals(cardName)) return c;
+        }
+        return null;
     }
 
     /**
@@ -408,10 +616,21 @@ public class GameSession {
                 }
                 ps.setResources(res);
 
-                List<String> cards = new ArrayList<>();
-                if (p.getPlayableCards() != null) for (IDevelopmentCard c : p.getPlayableCards()) cards.add(c.getName());
-                if (p.getNewCards()      != null) for (IDevelopmentCard c : p.getNewCards())      cards.add(c.getName());
-                ps.setDevCards(cards);
+                List<String> allCards = new ArrayList<>();
+                List<String> playable = new ArrayList<>();
+                if (p.getPlayableCards() != null) {
+                    for (IDevelopmentCard c : p.getPlayableCards()) {
+                        allCards.add(c.getName());
+                        playable.add(c.getName());
+                    }
+                }
+                if (p.getNewCards() != null) {
+                    for (IDevelopmentCard c : p.getNewCards()) {
+                        allCards.add(c.getName());
+                    }
+                }
+                ps.setDevCards(allCards);
+                ps.setPlayableDevCards(playable);
             }
             // Para não-viewers: resources e devCards ficam vazios — o cliente não recebe detalhes.
 

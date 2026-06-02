@@ -48,6 +48,7 @@ public final class MessageType {
     public static final String PLAY_YEAR_OF_PLENTY = "PLAY_YEAR_OF_PLENTY";
     // targetId: JSON {"res1":"WOOD","res2":"ORE"}
     public static final String PLAY_ROAD_BUILDING  = "PLAY_ROAD_BUILDING";
+    public static final String PLAY_VICTORY_POINT  = "PLAY_VICTORY_POINT";
 
     // ----- Servidor -> Cliente -----
     public static final String ROOM_LIST    = "ROOM_LIST";    // data: rooms (List<RoomInfo>)

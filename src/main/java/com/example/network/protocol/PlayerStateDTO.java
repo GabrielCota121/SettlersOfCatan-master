@@ -29,6 +29,7 @@ public class PlayerStateDTO {
 
     private Map<String, Integer> resources = new HashMap<>();
     private List<String> devCards = new ArrayList<>();
+    private List<String> playableDevCards = new ArrayList<>();
 
     public String getName() { return name; }
     public void setName(String v) { this.name = v; }
@@ -59,6 +60,9 @@ public class PlayerStateDTO {
 
     public List<String> getDevCards() { return devCards; }
     public void setDevCards(List<String> v) { this.devCards = v == null ? new ArrayList<>() : v; }
+
+    public List<String> getPlayableDevCards() { return playableDevCards; }
+    public void setPlayableDevCards(List<String> v) { this.playableDevCards = v == null ? new ArrayList<>() : v; }
 
     public boolean isHiddenResources() { return hiddenResources; }
     public void setHiddenResources(boolean v) { this.hiddenResources = v; }

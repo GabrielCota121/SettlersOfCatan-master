@@ -159,6 +159,9 @@ public class Main extends Application {
             players.add(new Player(4, "Lucas", "GREEN"));
         }
 
+        // Embaralha a ordem dos jogadores para variar quem começa
+        if (online) Collections.shuffle(players);
+
         if (online && gameClient != null) {
             String myName = gameClient.getPlayerName();
             myPlayer = players.stream()
@@ -412,27 +415,33 @@ public class Main extends Application {
                     cardView.setOnMouseClicked(e -> {
                         if (!canPlay) {
                             if (!isPlayable) {
-                                gameManager.getLogger().log("Você não pode jogar uma carta comprada no mesmo turno!");
+
+                                gameManager.getLogger().log(
+                                    "Você não pode jogar uma carta comprada no mesmo turno!");
                             } else {
-                                gameManager.getLogger().log("Você não pode jogar cartas agora!");
+                                gameManager.getLogger().log(
+                                    "Você não pode jogar cartas agora!");
                             }
                             return;
                         }
                         if (online) {
-                            switch (card.getName()) {
-                                case "Knight"         -> gameClient.sendIntent("PLAY_KNIGHT", null);
-                                case "Road Building"  -> gameClient.sendIntent("PLAY_ROAD_BUILDING", null);
-                                // Monopoly e YearOfPlenty precisam de seleção de recurso:
-                                // deixa o fluxo local rodar para mostrar a sidebar, o
-                                // botão de confirmação da sidebar envia o intent ao servidor.
-                                default -> {
-                                    boolean success = state.playDevelopmentCard(card, gameManager.getCurrentTurn());
-                                    if (success && updateActionUIRef[0] != null) updateActionUIRef[0].run();
-                                }
+                            // Envia a intenção ao servidor com o tipo de carta
+                            String cardAction = switch (card.getName()) {
+                                case "Knight"         -> "PLAY_KNIGHT";
+                                case "Monopoly"       -> "PLAY_MONOPOLY";
+                                case "Road Building"  -> "PLAY_ROAD_BUILDING";
+                                case "Year of Plenty" -> "PLAY_YEAR_OF_PLENTY";
+                                case "Victory Point"  -> "PLAY_VICTORY_POINT";
+                                default               -> null;
+                            };
+                            if (cardAction != null) {
+                                gameClient.sendIntent(cardAction, null);
                             }
                             return;
                         }
-                        boolean success = state.playDevelopmentCard(card, gameManager.getCurrentTurn());
+                        // Modo offline: lógica local original
+                        boolean success = state.playDevelopmentCard(
+                            card, gameManager.getCurrentTurn());
                         if (success && updateActionUIRef[0] != null) {
                             updateActionUIRef[0].run();
                         }
@@ -531,14 +540,21 @@ public class Main extends Application {
         });
 
         tradeButtonPane.setOnMouseClicked(e -> {
-            if (online) {
-                gameManager.getLogger().log("Trocas em rede serão liberadas na próxima atualização.");
-                return;
-            }
             ITurnState currentState = gameManager.getCurrentTurn().getState();
             if (!(currentState instanceof MainState)) {
-                gameManager.getLogger().log("Você só pode propor trocas na MainState!");
+                gameManager.getLogger().log(
+                    "Você só pode propor trocas na MainState!");
                 return;
+            }
+            // Em modo online: só o jogador da vez pode iniciar troca
+            if (online && myPlayer != null) {
+                Player currentPlayer =
+                    gameManager.getCurrentTurn().getCurrentPlayer();
+                if (!myPlayer.equals(currentPlayer)) {
+                    gameManager.getLogger().log(
+                        "Você só pode iniciar uma troca no seu turno!");
+                    return;
+                }
             }
             buildTradeOptionsSidebar();
         });
@@ -693,6 +709,51 @@ public class Main extends Application {
                 case DIGIT4: case NUMPAD4: playerIndex = 3; break;
                 case DIGIT0: case NUMPAD0: case ESCAPE:
                     bindPlayerToUI.run();
+                    event.consume();
+                    return;
+                case Q:
+                    if (!online) {
+                        gameManager.getCurrentTurn()
+                            .getCurrentPlayer()
+                            .getWallet().addResource(ResourceType.WOOD, 1);
+                        updateActionUIRef[0].run();
+                    }
+                    event.consume();
+                    return;
+                case W:
+                    if (!online) {
+                        gameManager.getCurrentTurn()
+                            .getCurrentPlayer()
+                            .getWallet().addResource(ResourceType.BRICK, 1);
+                        updateActionUIRef[0].run();
+                    }
+                    event.consume();
+                    return;
+                case E:
+                    if (!online) {
+                        gameManager.getCurrentTurn()
+                            .getCurrentPlayer()
+                            .getWallet().addResource(ResourceType.WOOL, 1);
+                        updateActionUIRef[0].run();
+                    }
+                    event.consume();
+                    return;
+                case R:
+                    if (!online) {
+                        gameManager.getCurrentTurn()
+                            .getCurrentPlayer()
+                            .getWallet().addResource(ResourceType.WHEAT, 1);
+                        updateActionUIRef[0].run();
+                    }
+                    event.consume();
+                    return;
+                case T:
+                    if (!online) {
+                        gameManager.getCurrentTurn()
+                            .getCurrentPlayer()
+                            .getWallet().addResource(ResourceType.ORE, 1);
+                        updateActionUIRef[0].run();
+                    }
                     event.consume();
                     return;
                 default:
@@ -894,9 +955,18 @@ public class Main extends Application {
                 }
                 p.getPlayableCards().clear();
                 p.getNewCards().clear();
+                // O servidor envia as cartas na ordem: playable primeiro, new depois.
+                // VictoryPointCard nunca deve aparecer como jogável — vai para newCards
+                // para ficar visível mas não clicável (o ponto já foi concedido ao comprar).
                 for (String cardName : ps.getDevCards()) {
                     IDevelopmentCard c = devCardFromName(cardName);
-                    if (c != null) p.addPlayableCard(c);
+                    if (c != null) {
+                        if (c instanceof VictoryPointCard) {
+                            p.addNewCard(c); // VP card: visível mas não jogável
+                        } else {
+                            p.addPlayableCard(c);
+                        }
+                    }
                 }
             }
         }
@@ -910,18 +980,49 @@ public class Main extends Application {
     }
 
     /** Reconstrói um {@link ITurnState} a partir do snapshot, só para gating da UI. */
-    private ITurnState stateFromSnapshot(GameStateDTO s, Map<String, Player> byName) {
+    private ITurnState stateFromSnapshot(GameStateDTO s,
+            Map<String, Player> byName) {
         if (s.getWinnerName() != null) {
             Player winner = byName.get(s.getWinnerName());
             if (winner != null) return new GameOverState(winner);
         }
         if (s.isSetupPhase()) return new SetupState(s.isSetupSecondPass());
+
         String n = s.getStateName();
+        if (n == null) return new WaitingRollState();
+
+        // Fase Principal
         if ("Fase Principal".equals(n)) return new MainState();
+
+        // Aguardando rolar os dados
         if ("Aguardando rolar os dados!".equals(n)) return new WaitingRollState();
-        // Estados ainda não suportados em rede (ladrão/descarte/troca): cai para
-        // um estado neutro; a interação correspondente chega na próxima fase.
-        return new WaitingRollState();
+
+        // Ladrão
+        if (n.contains("Robber") || n.contains("mover o Robber")) {
+            return new MoveRobberState(new MainState());
+        }
+
+        // Descarte de cartas (dado 7)
+        if (n.contains("descartar") || n.contains("descart")) {
+            if (s.getDiscardPendingPlayers() != null &&
+                    !s.getDiscardPendingPlayers().isEmpty()) {
+                List<Player> pending = s.getDiscardPendingPlayers()
+                    .stream()
+                    .map(byName::get)
+                    .filter(java.util.Objects::nonNull)
+                    .collect(java.util.stream.Collectors.toList());
+                return new WaitingDiscardState(pending);
+            }
+            return new MainState();
+        }
+
+        // Trocas em andamento (estado representado pelo activeTrade no DTO)
+        if (n.contains("Aguardando Resposta") || s.getActiveTrade() != null) {
+            return new MainState();
+        }
+
+        // Default: deixa o estado como MainState para não bloquear UI
+        return new MainState();
     }
 
     private IDevelopmentCard devCardFromName(String name) {
@@ -1163,105 +1264,227 @@ public class Main extends Application {
 
     private void buildBankTradeSidebar() {
         rightSidebar.getChildren().clear();
+
         Player player = gameManager.getCurrentTurn().getCurrentPlayer();
+        if (online && myPlayer != null) player = myPlayer;
+        final Player tradingPlayer = player;
 
-        Label titleLabel = new Label("Troca Marítima");
-        titleLabel.setStyle("-fx-text-fill: white; -fx-font-size: 18px; -fx-font-weight: bold;");
+        VBox box = new VBox(10);
+        box.setStyle("-fx-padding: 14; -fx-background-color: #1a2538;");
 
-        Label offerLabel = new Label("Oferecer:");
-        offerLabel.setStyle("-fx-text-fill: white;");
-        ComboBox<ResourceType> offerCombo = new ComboBox<>();
-        for (ResourceType type : ResourceType.values()) {
-            if (type != ResourceType.DESERT) offerCombo.getItems().add(type);
+        Label title = new Label("Troca com o Banco");
+        title.setStyle("-fx-text-fill: #f1c40f; -fx-font-size: 14px;" +
+                       "-fx-font-weight: bold;");
+        box.getChildren().add(title);
+
+        Label hint = new Label("Escolha o que dar e o que receber.");
+        hint.setStyle("-fx-text-fill: #7f8c8d; -fx-font-size: 11px;");
+        box.getChildren().add(hint);
+
+        // Estado mutável das seleções
+        Map<ResourceType, Integer> giveSelection = new HashMap<>();
+        Map<ResourceType, Integer> receiveSelection = new HashMap<>();
+        for (ResourceType rt : ResourceType.values()) {
+            if (rt == ResourceType.DESERT) continue;
+            giveSelection.put(rt, 0);
+            receiveSelection.put(rt, 0);
         }
 
-        Label receiveLabel = new Label("Receber 1x:");
-        receiveLabel.setStyle("-fx-text-fill: white;");
-        ComboBox<ResourceType> receiveCombo = new ComboBox<>();
-        for (ResourceType type : ResourceType.values()) {
-            if (type != ResourceType.DESERT) receiveCombo.getItems().add(type);
-        }
+        // Botão de confirmar
+        Button confirmBtn = new Button("Confirmar troca");
+        Label statusLabel = new Label("");
+        statusLabel.setStyle("-fx-text-fill: #e67e22; -fx-font-size: 11px;" +
+                             "-fx-wrap-text: true;");
 
-        Label infoLabel = new Label("Selecione os recursos:");
-        infoLabel.setStyle("-fx-text-fill: yellow; -fx-wrap-text: true; -fx-text-alignment: center;");
+        // Função que valida a troca conforme regras do banco
+        Runnable validateAndUpdate = () -> {
+            int totalGive = giveSelection.values()
+                .stream().mapToInt(Integer::intValue).sum();
+            int totalReceive = receiveSelection.values()
+                .stream().mapToInt(Integer::intValue).sum();
 
-        Button confirmBtn = new Button("Confirmar");
-        confirmBtn.setDisable(true);
-        confirmBtn.setStyle("-fx-font-weight: bold; -fx-base: #2ecc71;");
+            if (totalGive == 0 && totalReceive == 0) {
+                statusLabel.setText("");
+                confirmBtn.setDisable(true);
+                return;
+            }
 
-        Runnable checkTradeValidity = () -> {
-            ResourceType offer = offerCombo.getValue();
-            ResourceType receive = receiveCombo.getValue();
-
-            if (offer != null && receive != null) {
-                if (offer == receive) {
-                    infoLabel.setText("Você não pode trocar recursos iguais!");
-                    infoLabel.setStyle("-fx-text-fill: #e74c3c;");
+            // Calcula quantos recursos o jogador "pode ganhar" com o que dá,
+            // considerando as tradeRates dele (4:1, 3:1 ou 2:1 com portos)
+            int allowedReceive = 0;
+            for (Map.Entry<ResourceType, Integer> e : giveSelection.entrySet()) {
+                if (e.getValue() == 0) continue;
+                int rate = tradingPlayer.getTradeRates()
+                    .getOrDefault(e.getKey(), 4);
+                if (e.getValue() % rate != 0) {
+                    statusLabel.setText("Quantidade de " + e.getKey()
+                        + " precisa ser múltiplo de " + rate);
                     confirmBtn.setDisable(true);
                     return;
                 }
-                int rate = player.getTradeRate(offer);
-                int playerHas = player.getWallet().getResourceAmount(offer);
+                allowedReceive += e.getValue() / rate;
+            }
 
-                if (playerHas >= rate) {
-                    if (gameManager.getBank().getWallet().getResourceAmount(receive) >= 1) {
-                        infoLabel.setText("Taxa: " + rate + " " + offer.name() + " por 1 " + receive.name());
-                        infoLabel.setStyle("-fx-text-fill: #2ecc71;");
-                        confirmBtn.setDisable(false);
-                    } else {
-                        infoLabel.setText("O Banco não tem recursos suficientes!");
-                        infoLabel.setStyle("-fx-text-fill: #e74c3c;");
-                        confirmBtn.setDisable(true);
-                    }
-                } else {
-                    infoLabel.setText("Você precisa de " + rate + " " + offer.name() + ", mas só tem " + playerHas + ".");
-                    infoLabel.setStyle("-fx-text-fill: #e74c3c;");
+            if (allowedReceive != totalReceive) {
+                statusLabel.setText("Troca inválida: você daria "
+                    + totalGive + " e receberia " + totalReceive
+                    + " (válido: " + allowedReceive + ")");
+                confirmBtn.setDisable(true);
+                return;
+            }
+
+            // Verifica se o jogador tem os recursos
+            for (Map.Entry<ResourceType, Integer> e : giveSelection.entrySet()) {
+                if (tradingPlayer.getWallet().getResourceAmount(e.getKey())
+                        < e.getValue()) {
+                    statusLabel.setText(
+                        "Você não tem recursos suficientes de " + e.getKey());
                     confirmBtn.setDisable(true);
+                    return;
                 }
             }
+
+            statusLabel.setText("✅ Troca válida");
+            confirmBtn.setDisable(false);
         };
 
-        offerCombo.setOnAction(e -> checkTradeValidity.run());
-        receiveCombo.setOnAction(e -> checkTradeValidity.run());
+        // Constrói as linhas de seleção (dar / receber)
+        VBox giveBox = new VBox(4);
+        Label giveTitle = new Label("Você dá:");
+        giveTitle.setStyle("-fx-text-fill: #ecf0f1; -fx-font-weight: bold;");
+        giveBox.getChildren().add(giveTitle);
+
+        for (ResourceType rt : ResourceType.values()) {
+            if (rt == ResourceType.DESERT) continue;
+            HBox row = new HBox(8);
+            row.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+
+            Label rtLabel = new Label(rt.name() +
+                " (tenho " +
+                tradingPlayer.getWallet().getResourceAmount(rt) + ")");
+            rtLabel.setStyle("-fx-text-fill: white; -fx-min-width: 130px;");
+
+            Label countLabel = new Label("0");
+            countLabel.setStyle("-fx-text-fill: #f1c40f; -fx-min-width: 30px;");
+
+            Button minusBtn = new Button("-");
+            Button plusBtn = new Button("+");
+
+            minusBtn.setOnAction(ev -> {
+                int cur = giveSelection.get(rt);
+                if (cur > 0) {
+                    giveSelection.put(rt, cur - 1);
+                    countLabel.setText(String.valueOf(cur - 1));
+                    validateAndUpdate.run();
+                }
+            });
+            plusBtn.setOnAction(ev -> {
+                int cur = giveSelection.get(rt);
+                if (tradingPlayer.getWallet().getResourceAmount(rt) > cur) {
+                    giveSelection.put(rt, cur + 1);
+                    countLabel.setText(String.valueOf(cur + 1));
+                    validateAndUpdate.run();
+                }
+            });
+
+            row.getChildren().addAll(rtLabel, minusBtn, countLabel, plusBtn);
+            giveBox.getChildren().add(row);
+        }
+
+        VBox receiveBox = new VBox(4);
+        Label receiveTitle = new Label("Você recebe:");
+        receiveTitle.setStyle("-fx-text-fill: #ecf0f1; -fx-font-weight: bold;");
+        receiveBox.getChildren().add(receiveTitle);
+
+        for (ResourceType rt : ResourceType.values()) {
+            if (rt == ResourceType.DESERT) continue;
+            HBox row = new HBox(8);
+            row.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+
+            Label rtLabel = new Label(rt.name());
+            rtLabel.setStyle("-fx-text-fill: white; -fx-min-width: 130px;");
+
+            Label countLabel = new Label("0");
+            countLabel.setStyle("-fx-text-fill: #2ecc71; -fx-min-width: 30px;");
+
+            Button minusBtn = new Button("-");
+            Button plusBtn = new Button("+");
+
+            minusBtn.setOnAction(ev -> {
+                int cur = receiveSelection.get(rt);
+                if (cur > 0) {
+                    receiveSelection.put(rt, cur - 1);
+                    countLabel.setText(String.valueOf(cur - 1));
+                    validateAndUpdate.run();
+                }
+            });
+            plusBtn.setOnAction(ev -> {
+                int cur = receiveSelection.get(rt);
+                receiveSelection.put(rt, cur + 1);
+                countLabel.setText(String.valueOf(cur + 1));
+                validateAndUpdate.run();
+            });
+
+            row.getChildren().addAll(rtLabel, minusBtn, countLabel, plusBtn);
+            receiveBox.getChildren().add(row);
+        }
+
+        // Estilo do botão confirmar
+        confirmBtn.setStyle("-fx-background-color: #27ae60;" +
+            "-fx-text-fill: white; -fx-font-weight: bold;" +
+            "-fx-padding: 8 14; -fx-cursor: hand;");
+        confirmBtn.setDisable(true);
 
         confirmBtn.setOnAction(e -> {
-            ResourceType offer = offerCombo.getValue();
-            ResourceType receive = receiveCombo.getValue();
-            int rate = player.getTradeRates().getOrDefault(offer, 4);
-
             if (online) {
                 try {
                     Map<String, Integer> giveMap = new HashMap<>();
-                    giveMap.put(offer.name(), rate);
-
+                    Map<String, Integer> wantMap = new HashMap<>();
+                    for (Map.Entry<ResourceType, Integer> en
+                            : giveSelection.entrySet()) {
+                        if (en.getValue() > 0)
+                            giveMap.put(en.getKey().name(), en.getValue());
+                    }
+                    for (Map.Entry<ResourceType, Integer> en
+                            : receiveSelection.entrySet()) {
+                        if (en.getValue() > 0)
+                            wantMap.put(en.getKey().name(), en.getValue());
+                    }
+                    com.fasterxml.jackson.databind.ObjectMapper om =
+                        new com.fasterxml.jackson.databind.ObjectMapper();
                     Map<String, Object> payload = new HashMap<>();
                     payload.put("give", giveMap);
-                    payload.put("receive", receive.name());
-
-                    String json = new com.fasterxml.jackson.databind.ObjectMapper()
-                        .writeValueAsString(payload);
-                    gameClient.sendIntent("BANK_TRADE", json);
-                } catch (Exception ex) {
-                    ex.printStackTrace();
-                }
+                    payload.put("receive", wantMap);
+                    gameClient.sendIntent("BANK_TRADE", om.writeValueAsString(payload));
+                } catch (Exception ex) { ex.printStackTrace(); }
             } else {
-                // lógica local original — mantém como estava
-                player.getWallet().removeResource(offer, rate);
-                gameManager.getBank().getWallet().addResource(offer, rate);
-                gameManager.getBank().getWallet().removeResource(receive, 1);
-                player.getWallet().addResource(receive, 1);
-
-                gameManager.getLogger().log(player.getName() + " trocou " + rate + " " + offer + " por 1 " + receive + ".");
-                updateSidebar();
+                // Modo offline: aplica diretamente
+                for (Map.Entry<ResourceType, Integer> en
+                        : giveSelection.entrySet()) {
+                    if (en.getValue() > 0)
+                        tradingPlayer.getWallet()
+                            .removeResource(en.getKey(), en.getValue());
+                }
+                for (Map.Entry<ResourceType, Integer> en
+                        : receiveSelection.entrySet()) {
+                    if (en.getValue() > 0)
+                        tradingPlayer.getWallet()
+                            .addResource(en.getKey(), en.getValue());
+                }
+                gameManager.getLogger().log(
+                    tradingPlayer.getName() + " trocou com o banco.");
             }
+            buildTradeOptionsSidebar();
         });
 
-        Button btnCancel = new Button("Voltar");
-        btnCancel.setStyle("-fx-font-weight: bold; -fx-base: #95a5a6;");
-        btnCancel.setOnAction(e -> buildTradeOptionsSidebar());
+        Button cancelBtn = new Button("Cancelar");
+        cancelBtn.setStyle("-fx-background-color: #c0392b;" +
+            "-fx-text-fill: white; -fx-padding: 8 14;");
+        cancelBtn.setOnAction(e -> buildTradeOptionsSidebar());
 
-        rightSidebar.getChildren().addAll(titleLabel, offerLabel, offerCombo, receiveLabel, receiveCombo, infoLabel, confirmBtn, btnCancel);
-        buildPlayerOverviewSidebar();
+        HBox btnRow = new HBox(8, confirmBtn, cancelBtn);
+        box.getChildren().addAll(giveBox, receiveBox, statusLabel, btnRow);
+        rightSidebar.getChildren().add(box);
     }
 
     private void render(GraphicsContext gc, Board board, boolean force) {

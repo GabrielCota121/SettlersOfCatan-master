@@ -235,6 +235,17 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
                     NetworkMessage.of(MessageType.TRADE_UPDATE)
                         .put("trade", snap.getActiveTrade()),
                     null);
+            } else {
+                // Se uma troca acabou de ser resolvida/cancelada, envia o
+                // estado final UMA vez para os clientes fecharem o painel
+                com.example.network.protocol.TradeStatusDTO resolved =
+                    game.consumeLastResolvedTrade();
+                if (resolved != null) {
+                    broadcastToRoom(room,
+                        NetworkMessage.of(MessageType.TRADE_UPDATE)
+                            .put("trade", resolved),
+                        null);
+                }
             }
         } else {
             sendTo(session,
