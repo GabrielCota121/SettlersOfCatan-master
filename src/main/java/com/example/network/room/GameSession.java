@@ -109,8 +109,12 @@ public class GameSession {
         Player current = turn.getCurrentPlayer();
 
         boolean isCurrentPlayer = current.getName().equals(senderName);
-        boolean isTradeResponse = "TRADE_RESPONSE".equals(action);
-        if (!isCurrentPlayer && !isTradeResponse) {
+        // Ações que QUALQUER jogador pode enviar (não só o da vez):
+        // - TRADE_RESPONSE: responder a uma proposta de troca
+        // - SUBMIT_DISCARD: descartar cartas quando sai 7 (todos com +7 cartas)
+        boolean isAllowedForNonCurrent =
+            "TRADE_RESPONSE".equals(action) || "SUBMIT_DISCARD".equals(action);
+        if (!isCurrentPlayer && !isAllowedForNonCurrent) {
             return false;
         }
 
