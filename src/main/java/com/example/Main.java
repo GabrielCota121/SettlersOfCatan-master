@@ -384,8 +384,9 @@ public class Main extends Application {
             Player currentPlayer = gameManager.getCurrentTurn().getCurrentPlayer();
             ITurnState state = gameManager.getCurrentTurn().getState();
 
-            List<IDevelopmentCard> playableCards = currentPlayer.getPlayableCards();
-            List<IDevelopmentCard> newCards = currentPlayer.getNewCards();
+            Player cardOwner = (online && myPlayer != null) ? myPlayer : currentPlayer;
+            List<IDevelopmentCard> playableCards = cardOwner.getPlayableCards();
+            List<IDevelopmentCard> newCards = cardOwner.getNewCards();
 
             List<IDevelopmentCard> allCards = new ArrayList<>();
             if (playableCards != null) allCards.addAll(playableCards);
@@ -399,7 +400,10 @@ public class Main extends Application {
 
                     boolean isCorrectState = state instanceof MainState || state instanceof WaitingRollState;
                     boolean isPlayable = playableCards != null && playableCards.contains(card);
-                    boolean canPlay = isCorrectState && isPlayable;
+                    boolean isMyTurn = !online ||
+                        (myPlayer != null &&
+                         myPlayer.equals(gameManager.getCurrentTurn().getCurrentPlayer()));
+                    boolean canPlay = isCorrectState && isPlayable && isMyTurn;
 
                     cardView.setOpacity(canPlay ? 1.0 : 0.5);
                     cardView.setCursor(canPlay ? javafx.scene.Cursor.HAND : javafx.scene.Cursor.DEFAULT);
@@ -414,8 +418,10 @@ public class Main extends Application {
 
                     cardView.setOnMouseClicked(e -> {
                         if (!canPlay) {
-                            if (!isPlayable) {
-
+                            if (online && !isMyTurn) {
+                                gameManager.getLogger().log(
+                                    "Você só pode jogar cartas no seu turno!");
+                            } else if (!isPlayable) {
                                 gameManager.getLogger().log(
                                     "Você não pode jogar uma carta comprada no mesmo turno!");
                             } else {
@@ -425,17 +431,19 @@ public class Main extends Application {
                             return;
                         }
                         if (online) {
-                            // Envia a intenção ao servidor com o tipo de carta
-                            String cardAction = switch (card.getName()) {
-                                case "Knight"         -> "PLAY_KNIGHT";
-                                case "Monopoly"       -> "PLAY_MONOPOLY";
-                                case "Road Building"  -> "PLAY_ROAD_BUILDING";
-                                case "Year of Plenty" -> "PLAY_YEAR_OF_PLENTY";
-                                case "Victory Point"  -> "PLAY_VICTORY_POINT";
-                                default               -> null;
-                            };
-                            if (cardAction != null) {
-                                gameClient.sendIntent(cardAction, null);
+                            switch (card.getName()) {
+                                case "Knight" ->
+                                    gameClient.sendIntent("PLAY_KNIGHT", null);
+                                case "Road Building" ->
+                                    gameClient.sendIntent("PLAY_ROAD_BUILDING", null);
+                                case "Monopoly" ->
+                                    showMonopolyResourcePicker(); // seletor envia depois
+                                case "Year of Plenty" ->
+                                    showYearOfPlentyResourcePicker(); // seletor envia depois
+                                case "Victory Point" ->
+                                    gameManager.getLogger().log(
+                                        "A carta de Ponto de Vitória já vale 1 ponto automaticamente.");
+                                default -> {}
                             }
                             return;
                         }
@@ -955,17 +963,21 @@ public class Main extends Application {
                 }
                 p.getPlayableCards().clear();
                 p.getNewCards().clear();
-                // O servidor envia as cartas na ordem: playable primeiro, new depois.
-                // VictoryPointCard nunca deve aparecer como jogável — vai para newCards
-                // para ficar visível mas não clicável (o ponto já foi concedido ao comprar).
+                // Usa a lista de jogáveis enviada pelo servidor para distinguir
+                // cartas que JÁ podem ser jogadas das compradas neste turno.
+                List<String> playableNames = new ArrayList<>(ps.getPlayableDevCards());
                 for (String cardName : ps.getDevCards()) {
                     IDevelopmentCard c = devCardFromName(cardName);
-                    if (c != null) {
-                        if (c instanceof VictoryPointCard) {
-                            p.addNewCard(c); // VP card: visível mas não jogável
-                        } else {
-                            p.addPlayableCard(c);
-                        }
+                    if (c == null) continue;
+                    if (c instanceof VictoryPointCard) {
+                        p.addNewCard(c); // VP: visível, ponto já contado, não jogável
+                        continue;
+                    }
+                    if (playableNames.contains(cardName)) {
+                        p.addPlayableCard(c);
+                        playableNames.remove(cardName); // trata duplicatas
+                    } else {
+                        p.addNewCard(c); // comprada neste turno
                     }
                 }
             }
@@ -1141,6 +1153,46 @@ public class Main extends Application {
             }
         });
         rightSidebar.getChildren().addAll(titleLabel, infoLabel, combosBox, confirmBtn);
+    }
+
+    private void showMonopolyResourcePicker() {
+        javafx.scene.control.ChoiceDialog<String> dialog =
+            new javafx.scene.control.ChoiceDialog<>("WOOD",
+                java.util.List.of("WOOD", "BRICK", "WOOL", "WHEAT", "ORE"));
+        dialog.setTitle("Monopólio");
+        dialog.setHeaderText("Escolha o recurso para monopolizar:");
+        dialog.setContentText("Recurso:");
+        dialog.showAndWait().ifPresent(res ->
+            gameClient.sendIntent("PLAY_MONOPOLY", res));
+    }
+
+    private void showYearOfPlentyResourcePicker() {
+        java.util.List<String> opts =
+            java.util.List.of("WOOD", "BRICK", "WOOL", "WHEAT", "ORE");
+        javafx.scene.control.ChoiceDialog<String> d1 =
+            new javafx.scene.control.ChoiceDialog<>("WOOD", opts);
+        d1.setTitle("Ano da Fartura");
+        d1.setHeaderText("Escolha o 1º recurso:");
+        d1.setContentText("Recurso 1:");
+        java.util.Optional<String> r1 = d1.showAndWait();
+        if (r1.isEmpty()) return;
+
+        javafx.scene.control.ChoiceDialog<String> d2 =
+            new javafx.scene.control.ChoiceDialog<>("WOOD", opts);
+        d2.setTitle("Ano da Fartura");
+        d2.setHeaderText("Escolha o 2º recurso:");
+        d2.setContentText("Recurso 2:");
+        java.util.Optional<String> r2 = d2.showAndWait();
+        if (r2.isEmpty()) return;
+
+        try {
+            Map<String, String> payload = new HashMap<>();
+            payload.put("res1", r1.get());
+            payload.put("res2", r2.get());
+            String json = new com.fasterxml.jackson.databind.ObjectMapper()
+                .writeValueAsString(payload);
+            gameClient.sendIntent("PLAY_YEAR_OF_PLENTY", json);
+        } catch (Exception ex) { ex.printStackTrace(); }
     }
 
     private void buildTradeOptionsSidebar() {
@@ -1984,6 +2036,19 @@ public class Main extends Application {
         box.getChildren().addAll(title, offerLabel);
 
         if ("PENDING".equals(myStatus)) {
+            boolean podeAceitar = true;
+            if (myPlayer != null) {
+                for (Map.Entry<String, Integer> e : trade.getWant().entrySet()) {
+                    try {
+                        ResourceType rt = ResourceType.valueOf(e.getKey());
+                        if (myPlayer.getWallet().getResourceAmount(rt) < e.getValue()) {
+                            podeAceitar = false;
+                            break;
+                        }
+                    } catch (Exception ignored) {}
+                }
+            }
+
             HBox btns = new HBox(10);
             btns.setAlignment(javafx.geometry.Pos.CENTER);
 
@@ -1991,6 +2056,12 @@ public class Main extends Application {
             acceptBtn.setStyle("-fx-background-color: #27ae60; -fx-text-fill: white;" +
                                "-fx-font-weight: bold; -fx-cursor: hand; -fx-padding: 8 16;");
             acceptBtn.setOnAction(e -> gameClient.sendIntent("TRADE_RESPONSE", "true"));
+            acceptBtn.setDisable(!podeAceitar);
+            if (!podeAceitar) {
+                Label aviso = new Label("Você não tem os recursos pedidos.");
+                aviso.setStyle("-fx-text-fill: #e67e22; -fx-font-size: 11px;");
+                box.getChildren().add(aviso);
+            }
 
             Button declineBtn = new Button("❌ Recusar");
             declineBtn.setStyle("-fx-background-color: #c0392b; -fx-text-fill: white;" +
