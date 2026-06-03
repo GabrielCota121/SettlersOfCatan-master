@@ -802,17 +802,22 @@ public class Main extends Application {
             gameClient.setOnMessage(msg -> {
                 switch (msg.getType()) {
                     case MessageType.GAME_STATE -> {
-                        GameStateDTO st = objectMapper.convertValue(msg.getData().get("state"), GameStateDTO.class);
-                        applyGameState(st);
-                        // Garante que a handView sempre mostre o jogador local
-                        // independente de quem é o turno atual.
-                        if (myPlayer != null) {
-                            handView.update(myPlayer);
-                        }
-                        bindPlayerToUI.run();
-                        render(gc, board, true);
+                        GameStateDTO st = objectMapper.convertValue(
+                            msg.getData().get("state"), GameStateDTO.class);
+                        Platform.runLater(() -> {
+                            applyGameState(st);
+                            if (myPlayer != null) {
+                                handView.update(myPlayer);
+                            }
+                            bindPlayerToUI.run();
+                            render(gc, board, true);
+                            updateSidebar();
+                        });
                     }
-                    case MessageType.GAME_EVENT -> logArea.appendText("🎲 " + msg.getString("message") + "\n");
+                    case MessageType.GAME_EVENT -> {
+                        String evMsg = msg.getString("message");
+                        Platform.runLater(() -> logArea.appendText("🎲 " + evMsg + "\n"));
+                    }
                     case MessageType.TRADE_UPDATE -> {
                         com.example.network.protocol.TradeStatusDTO trade =
                             objectMapper.convertValue(
@@ -968,16 +973,12 @@ public class Main extends Application {
                 }
                 p.getPlayableCards().clear();
                 p.getNewCards().clear();
-                // Usa a lista de jogáveis enviada pelo servidor para distinguir
-                // cartas que JÁ podem ser jogadas das compradas neste turno.
+                // Usa SÓ a lista do servidor para decidir o que é jogável.
+                // VictoryPoint segue a mesma regra das outras cartas.
                 List<String> playableNames = new ArrayList<>(ps.getPlayableDevCards());
                 for (String cardName : ps.getDevCards()) {
                     IDevelopmentCard c = devCardFromName(cardName);
                     if (c == null) continue;
-                    if (c instanceof VictoryPointCard) {
-                        p.addNewCard(c); // VP: visível, ponto já contado, não jogável
-                        continue;
-                    }
                     if (playableNames.contains(cardName)) {
                         p.addPlayableCard(c);
                         playableNames.remove(cardName); // trata duplicatas
