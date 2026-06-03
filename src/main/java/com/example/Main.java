@@ -417,11 +417,6 @@ public class Main extends Application {
                     }
 
                     cardView.setOnMouseClicked(e -> {
-                        if (card instanceof VictoryPointCard) {
-                            gameManager.getLogger().log(
-                                "A carta de Ponto de Vitória já vale 1 ponto automaticamente.");
-                            return;
-                        }
                         if (!canPlay) {
                             if (online && !isMyTurn) {
                                 gameManager.getLogger().log(
@@ -446,8 +441,7 @@ public class Main extends Application {
                                 case "Year of Plenty" ->
                                     showYearOfPlentyResourcePicker(); // seletor envia depois
                                 case "Victory Point" ->
-                                    gameManager.getLogger().log(
-                                        "A carta de Ponto de Vitória já vale 1 ponto automaticamente.");
+                                    gameClient.sendIntent("PLAY_VICTORY_POINT", null);
                                 default -> {}
                             }
                             return;

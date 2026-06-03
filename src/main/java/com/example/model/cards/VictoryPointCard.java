@@ -4,19 +4,20 @@ import com.example.model.game.CatanGameManager;
 import com.example.model.player.Player;
 
 public class VictoryPointCard implements IDevelopmentCard {
+
     @Override
     public String getName() { return "Victory Point"; }
 
     @Override
     public boolean play(CatanGameManager gameManager, Player player) {
-        gameManager.getLogger().log(
-            player.getName() + " já tem o ponto desta carta de Vitória.");
-        return false; // não há ação de jogar
+        player.incrementVictoryPoints();
+        gameManager.getLogger().log(player.getName()
+            + " usou uma carta de Victory Point e recebe 1 ponto!");
+        return true;
     }
 
     @Override
     public void onPurchase(Player player) {
-        player.incrementVictoryPoints();
-        player.addNewCard(this); // visível, ponto já contado, nunca jogável manualmente
+        player.addPlayableCard(this);
     }
 }

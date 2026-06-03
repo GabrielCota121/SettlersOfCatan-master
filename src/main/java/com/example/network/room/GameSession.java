@@ -478,24 +478,27 @@ public class GameSession {
             }
 
             case "PLAY_VICTORY_POINT": {
-                com.example.model.state.ITurnState st =
-                    manager.getCurrentTurn().getState();
                 com.example.model.player.Player sender2 = manager.getPlayers()
                     .stream().filter(p -> p.getName().equals(senderName))
                     .findFirst().orElse(null);
                 if (sender2 == null) return false;
-                java.util.Optional<com.example.model.cards.IDevelopmentCard> vpCard =
+                java.util.Optional<com.example.model.cards.IDevelopmentCard> vpCardOpt =
                     sender2.getPlayableCards().stream()
                         .filter(c -> c instanceof com.example.model.cards.VictoryPointCard)
                         .findFirst();
-                if (vpCard.isEmpty()) {
-                    vpCard = sender2.getNewCards().stream()
+                if (vpCardOpt.isEmpty()) {
+                    vpCardOpt = sender2.getNewCards().stream()
                         .filter(c -> c instanceof com.example.model.cards.VictoryPointCard)
                         .findFirst();
                 }
-                if (vpCard.isEmpty()) return false;
-                return st.playDevelopmentCard(vpCard.get(),
-                    manager.getCurrentTurn());
+                if (vpCardOpt.isEmpty()) return false;
+                com.example.model.cards.IDevelopmentCard vpCard = vpCardOpt.get();
+                boolean ok = vpCard.play(manager, sender2);
+                if (ok) {
+                    sender2.getPlayableCards().remove(vpCard);
+                    sender2.getNewCards().remove(vpCard);
+                }
+                return ok;
             }
 
             case "SUBMIT_DISCARD": {
@@ -659,9 +662,7 @@ public class GameSession {
                 if (p.getPlayableCards() != null) {
                     for (IDevelopmentCard c : p.getPlayableCards()) {
                         allCards.add(c.getName());
-                        if (!(c instanceof com.example.model.cards.VictoryPointCard)) {
-                            playable.add(c.getName());
-                        }
+                        playable.add(c.getName());
                     }
                 }
                 if (p.getNewCards() != null) {
