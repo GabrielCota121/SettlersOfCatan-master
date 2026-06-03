@@ -1868,16 +1868,29 @@ public class Main extends Application {
         for (Player p : gameManager.getPlayers()) {
             HBox playerBox = new HBox(15);
             playerBox.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
-            playerBox.setStyle("-fx-background-color: #2c3e50; -fx-padding: 8; -fx-background-radius: 8;");
+            Player currentPlayer = gameManager.getCurrentTurn() != null
+                ? gameManager.getCurrentTurn().getCurrentPlayer() : null;
+            boolean isCurrent = currentPlayer != null && currentPlayer.equals(p);
+            boolean isLocal = online && myPlayer != null && myPlayer.equals(p);
 
-            VBox settlementBox = new VBox(2);
+            String bg = isCurrent ? "#34495e" : "#2c3e50";
+            String border = isLocal ? "-fx-border-color: #2ecc71; -fx-border-width: 2;"
+                + "-fx-border-radius: 8;" : "";
+            playerBox.setStyle("-fx-background-color: " + bg + ";"
+                + "-fx-padding: 8; -fx-background-radius: 8;" + border);
+
+            VBox settlementBox = new VBox(4);
             settlementBox.setAlignment(javafx.geometry.Pos.CENTER);
+            settlementBox.setMinWidth(60);
 
-            Label vpLabel = new Label(p.getVictoryPoints() + " \u2605");
-            vpLabel.setStyle("-fx-text-fill: #f1c40f; -fx-font-weight: bold; -fx-font-size: 20px;");
+            Label vpLabel = new Label(String.valueOf(p.getVictoryPoints()));
+            vpLabel.setStyle("-fx-text-fill: #f1c40f; -fx-font-weight: bold;"
+                + "-fx-font-size: 28px;");
+            Label vpCaption = new Label("pontos");
+            vpCaption.setStyle("-fx-text-fill: #f1c40f; -fx-font-size: 10px;");
 
             ImageView iconView = new ImageView();
-            iconView.setFitHeight(25);
+            iconView.setFitHeight(22);
             iconView.setPreserveRatio(true);
             String colorName = p.getColor().toLowerCase();
             try {
@@ -1887,12 +1900,14 @@ public class Main extends Application {
                 System.out.println("Erro ao carregar mini-ícone.");
             }
 
-            settlementBox.getChildren().addAll(vpLabel, iconView);
+            settlementBox.getChildren().addAll(vpLabel, vpCaption, iconView);
 
             VBox infoBox = new VBox(5);
             infoBox.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
 
-            Label nameLabel = new Label(p.getName());
+            Label nameLabel = new Label(p.getName()
+                + (isCurrent ? "  (jogando)" : "")
+                + (isLocal ? "  (voce)" : ""));
             nameLabel.setStyle("-fx-text-fill: white; -fx-font-weight: bold; -fx-font-size: 20px;");
 
             int numResources = p.getWallet().getTotalCards();
