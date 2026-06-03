@@ -14,6 +14,7 @@ import com.example.network.protocol.GameStateDTO;
 import com.example.network.protocol.PlayerStateDTO;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -63,6 +64,9 @@ public class GameSession {
         for (RoomPlayer rp : roomPlayers) {
             players.add(new Player(id++, rp.getName(), rp.getColor()));
         }
+        // Embaralha UMA vez no servidor — fonte da verdade para a ordem dos jogadores.
+        // Clientes NÃO embaralham localmente para que todos vejam a mesma ordem.
+        Collections.shuffle(players, new java.util.Random(seed));
 
         this.manager = new CatanGameManager(board, players, logger);
 

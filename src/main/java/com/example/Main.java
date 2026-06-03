@@ -159,8 +159,10 @@ public class Main extends Application {
             players.add(new Player(4, "Lucas", "GREEN"));
         }
 
-        // Embaralha a ordem dos jogadores para variar quem começa
-        if (online) Collections.shuffle(players);
+        // NÃO embaralhar no cliente — o servidor é a fonte da verdade da
+        // ordem dos jogadores e de quem começa. Embaralhar localmente faria
+        // cada cliente ver uma ordem diferente.
+        if (!online) Collections.shuffle(players);
 
         if (online && gameClient != null) {
             String myName = gameClient.getPlayerName();
@@ -1914,8 +1916,8 @@ public class Main extends Application {
             int numDevCards = 0;
             if (p.getPlayableCards() != null) numDevCards += p.getPlayableCards().size();
             if (p.getNewCards() != null) numDevCards += p.getNewCards().size();
-            int numKnights = p.getPlayableCards() != null ? (int) p.getPlayableCards().stream().filter(c -> c.getName().equals("Knight")).count() : 0; // Fallback seguro baseado no modelo
-            int longestRoad = 0; // Customizar caso seu modelo forneça getLongestRoad() exposto publicamente
+            int numKnights = p.getNumKnights(); // cavaleiros já jogados (vem do servidor)
+            int longestRoad = p.getLongestRoad(); // tamanho da estrada (vem do servidor)
 
             HBox statsBox = new HBox(12);
             statsBox.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
