@@ -90,6 +90,25 @@ public class Room {
         return new ArrayList<>(players);
     }
 
+    /** Preenche vagas restantes com bots usando cores únicas não ocupadas por humanos. */
+    public synchronized void fillWithBots() {
+        String[] coresPossiveis = {"RED", "BLUE", "GREEN", "ORANGE", "PURPLE", "BLACK"};
+        java.util.Set<String> usadas = new java.util.HashSet<>();
+        for (RoomPlayer p : players) usadas.add(p.getColor());
+
+        int botNum = 1;
+        while (players.size() < maxPlayers) {
+            String cor = null;
+            for (String c : coresPossiveis) {
+                if (!usadas.contains(c)) { cor = c; break; }
+            }
+            if (cor == null) break;
+            usadas.add(cor);
+            String nome = "Bot " + botNum++;
+            players.add(new RoomPlayer("BOT-" + nome, nome, cor, true));
+        }
+    }
+
     /** Converte para o DTO enviado aos clientes. */
     public synchronized RoomInfo toInfo() {
         RoomInfo info = new RoomInfo();

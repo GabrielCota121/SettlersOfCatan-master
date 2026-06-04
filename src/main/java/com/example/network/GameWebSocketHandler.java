@@ -178,6 +178,8 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
             sendTo(session, error("Todos os jogadores precisam estar prontos (mínimo 2)."));
             return;
         }
+        // Se a sala não está cheia, completa as vagas com bots
+        room.fillWithBots();
         room.setStatus(RoomStatus.IN_GAME);
 
         // Instancia a partida AUTORITATIVA da sala. A seed determina o tabuleiro,

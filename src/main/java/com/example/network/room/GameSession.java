@@ -62,7 +62,9 @@ public class GameSession {
         List<Player> players = new ArrayList<>();
         int id = 1;
         for (RoomPlayer rp : roomPlayers) {
-            players.add(new Player(id++, rp.getName(), rp.getColor()));
+            Player p = new Player(id++, rp.getName(), rp.getColor());
+            p.setBot(rp.isBot());
+            players.add(p);
         }
         // Mantém a ordem em que os jogadores entraram na sala (sem shuffle)
         // para que servidor e clientes usem exatamente a mesma sequência.
@@ -76,6 +78,15 @@ public class GameSession {
     }
 
     public long getSeed() { return seed; }
+
+    public synchronized boolean isCurrentPlayerBot() {
+        Player current = manager.getCurrentTurn().getCurrentPlayer();
+        return current != null && current.isBot();
+    }
+
+    public synchronized String getCurrentPlayerName() {
+        return manager.getCurrentTurn().getCurrentPlayer().getName();
+    }
 
     /**
      * Monta um TradeStatusDTO inicial a partir de uma proposta de troca.

@@ -12,12 +12,22 @@ public class RoomPlayer {
     private String name;
     private String color;
     private boolean ready;
+    private boolean bot;
 
     public RoomPlayer(String sessionId, String name, String color) {
         this.sessionId = sessionId;
         this.name = name;
         this.color = color;
         this.ready = false;
+        this.bot = false;
+    }
+
+    public RoomPlayer(String sessionId, String name, String color, boolean bot) {
+        this.sessionId = sessionId;
+        this.name = name;
+        this.color = color;
+        this.ready = true; // bots já entram prontos
+        this.bot = bot;
     }
 
     public String getSessionId() { return sessionId; }
@@ -30,6 +40,9 @@ public class RoomPlayer {
 
     public boolean isReady() { return ready; }
     public void setReady(boolean ready) { this.ready = ready; }
+
+    public boolean isBot() { return bot; }
+    public void setBot(boolean bot) { this.bot = bot; }
 
     public PlayerInfo toInfo(boolean isHost) {
         return new PlayerInfo(name, color, ready, isHost);

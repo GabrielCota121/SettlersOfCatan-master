@@ -130,4 +130,8 @@ public class Player {
     public void setNumSettlements(int v) { this.numSettlements = v; }
     public void setNumCities(int v) { this.numCities = v; }
     public void setNumRoads(int v) { this.numRoads = v; }
+
+    private boolean bot = false;
+    public boolean isBot() { return bot; }
+    public void setBot(boolean bot) { this.bot = bot; }
 }
