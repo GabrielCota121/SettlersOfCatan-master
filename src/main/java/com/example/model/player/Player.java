@@ -23,6 +23,7 @@ public class Player {
     private int longestRoad;
     private final List<IDevelopmentCard> playableCards = new ArrayList<>();
     private final List<IDevelopmentCard> newCards = new ArrayList<>();
+    private int hiddenDevCardCount = -1;
 
     public Player(int id, String name, String color) {
         this.id = id;
@@ -113,6 +114,15 @@ public class Player {
     public List<IDevelopmentCard> getPlayableCards() {return playableCards;}
     public List<IDevelopmentCard> getNewCards() {return newCards;}
     public Map<ResourceType, Integer> getTradeRates() {return tradeRates;}
+
+    public void setHiddenDevCardCount(int n) { this.hiddenDevCardCount = n; }
+    public int getDevCardCount() {
+        if (hiddenDevCardCount >= 0) return hiddenDevCardCount;
+        int total = 0;
+        if (playableCards != null) total += playableCards.size();
+        if (newCards != null) total += newCards.size();
+        return total;
+    }
 
     // ----- Reconciliação com o estado autoritativo do servidor (GAME_STATE) -----
     public void setVictoryPoints(int v) { this.victoryPoints = v; }

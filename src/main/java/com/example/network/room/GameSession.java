@@ -64,9 +64,8 @@ public class GameSession {
         for (RoomPlayer rp : roomPlayers) {
             players.add(new Player(id++, rp.getName(), rp.getColor()));
         }
-        // Embaralha UMA vez no servidor — fonte da verdade para a ordem dos jogadores.
-        // Clientes NÃO embaralham localmente para que todos vejam a mesma ordem.
-        Collections.shuffle(players, new java.util.Random(seed));
+        // Mantém a ordem em que os jogadores entraram na sala (sem shuffle)
+        // para que servidor e clientes usem exatamente a mesma sequência.
 
         this.manager = new CatanGameManager(board, players, logger);
 

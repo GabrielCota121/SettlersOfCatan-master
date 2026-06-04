@@ -113,7 +113,7 @@ public class Main extends Application {
         javafx.geometry.Rectangle2D screen = Screen.getPrimary().getVisualBounds();
         WIDTH    = (int) screen.getWidth();
         HEIGHT   = (int) screen.getHeight();
-        SIDEBAR_W = (int) Math.min(300, screen.getWidth() * 0.17); // ~17 % da largura, máx 300 px
+        SIDEBAR_W = (int) Math.min(340, screen.getWidth() * 0.20); // ~20 % da largura, máx 340 px
         BOTTOM_H  = (int) Math.min(170, screen.getHeight() * 0.20); // ~20 % da altura, máx 170 px
 
         ConnectView connectView = new ConnectView(client -> {
@@ -193,7 +193,9 @@ public class Main extends Application {
         gameManager.getCurrentTurn().setState(new SetupState(false));
         logger.log("Bem-vindo à Ilha de Catan! GLGL!");
         logger.log("Fase atual: " + gameManager.getCurrentTurn().getState().getName());
-        logger.log(gameManager.getCurrentTurn().getCurrentPlayer().getName() + " começa!");
+        if (!online) {
+            logger.log(gameManager.getCurrentTurn().getCurrentPlayer().getName() + " começa!");
+        }
 
         Canvas canvas = new Canvas(WIDTH, HEIGHT);
         GraphicsContext gc = canvas.getGraphicsContext2D();
@@ -691,14 +693,7 @@ public class Main extends Application {
         bindPlayerToUI.run();
         gameManager.setOnTurnChangedListener(bindPlayerToUI);
 
-        Label myNameLabel = new Label(
-            online && myPlayer != null ? "Você: " + myPlayer.getName() : ""
-        );
-        myNameLabel.setStyle(
-            "-fx-text-fill: #2ecc71; -fx-font-size: 11px; -fx-font-weight: bold;"
-        );
-
-        HBox bottomMenu = new HBox(12, playerInfoBox, myNameLabel, handView, devCardsBox, spacer, turnControlsBox);
+        HBox bottomMenu = new HBox(12, handView, devCardsBox, spacer, turnControlsBox);
         bottomMenu.setPrefHeight(BOTTOM_H);
         // BorderPane coloca o bottom com largura TOTAL (incluindo atrás das sidebars).
         // Adicionamos padding lateral igual às sidebars para o conteúdo ficar visível.
@@ -876,6 +871,25 @@ public class Main extends Application {
         if (state == null) return;
         Board board = gameManager.getBoard();
 
+        // Reordena a lista local de jogadores para bater com a ordem do
+        // servidor (fonte da verdade). Garante que todos os clientes vejam
+        // a mesma ordem e o mesmo jogador inicial.
+        if (online && state.getPlayers() != null && !state.getPlayers().isEmpty()) {
+            List<Player> ordered = new ArrayList<>();
+            for (PlayerStateDTO ps : state.getPlayers()) {
+                for (Player p : gameManager.getPlayers()) {
+                    if (p.getName().equals(ps.getName())) {
+                        ordered.add(p);
+                        break;
+                    }
+                }
+            }
+            if (ordered.size() == gameManager.getPlayers().size()) {
+                gameManager.getPlayers().clear();
+                gameManager.getPlayers().addAll(ordered);
+            }
+        }
+
         Map<String, Player> byName = new HashMap<>();
         for (Player p : gameManager.getPlayers()) byName.put(p.getName(), p);
 
@@ -958,6 +972,8 @@ public class Main extends Application {
             p.setNumCities(ps.getNumCities());
             p.setNumRoads(ps.getNumRoads());
 
+            boolean isLocalPlayer = (online && myPlayer != null
+                    && myPlayer.getName().equals(ps.getName()));
             if (ps.isHiddenResources()) {
                 // Jogador cujos recursos NÃO pertencem a este cliente: armazena só
                 // o total (para a sidebar) e mantém os valores individuais zerados.
@@ -988,6 +1004,11 @@ public class Main extends Application {
                         p.addNewCard(c); // comprada neste turno
                     }
                 }
+            }
+            if (isLocalPlayer) {
+                p.setHiddenDevCardCount(-1); // usa as cartas reais
+            } else {
+                p.setHiddenDevCardCount(ps.getNumDevCardsTotal());
             }
             if (ps.getTradeRates() != null) {
                 for (Map.Entry<String, Integer> en : ps.getTradeRates().entrySet()) {
@@ -1913,9 +1934,7 @@ public class Main extends Application {
             nameLabel.setStyle("-fx-text-fill: white; -fx-font-weight: bold; -fx-font-size: 20px;");
 
             int numResources = p.getWallet().getTotalCards();
-            int numDevCards = 0;
-            if (p.getPlayableCards() != null) numDevCards += p.getPlayableCards().size();
-            if (p.getNewCards() != null) numDevCards += p.getNewCards().size();
+            int numDevCards = p.getDevCardCount();
             int numKnights = p.getNumKnights(); // cavaleiros já jogados (vem do servidor)
             int longestRoad = p.getLongestRoad(); // tamanho da estrada (vem do servidor)
 
@@ -1929,7 +1948,7 @@ public class Main extends Application {
             resIcon.setPreserveRatio(true);
             try { resIcon.setImage(new Image(getClass().getResourceAsStream("/assets/resources/resourceback.png"))); } catch (Exception e) {}
             Label resLabel = new Label(String.valueOf(numResources));
-            resLabel.setStyle("-fx-text-fill: #bdc3c7; -fx-font-weight: bold; -fx-font-size: 20px;");
+            resLabel.setStyle("-fx-text-fill: #bdc3c7; -fx-font-weight: bold; -fx-font-size: 16px; -fx-min-width: 24px;");
             resBox.getChildren().addAll(resIcon, resLabel);
 
             HBox devBox = new HBox(5);
@@ -1939,7 +1958,7 @@ public class Main extends Application {
             devIcon.setPreserveRatio(true);
             try { devIcon.setImage(new Image(getClass().getResourceAsStream("/assets/developmentcards/development.png"))); } catch (Exception e) {}
             Label devLabel = new Label(String.valueOf(numDevCards));
-            devLabel.setStyle("-fx-text-fill: #bdc3c7; -fx-font-weight: bold; -fx-font-size: 20px;");
+            devLabel.setStyle("-fx-text-fill: #bdc3c7; -fx-font-weight: bold; -fx-font-size: 16px; -fx-min-width: 24px;");
             devBox.getChildren().addAll(devIcon, devLabel);
 
             HBox knightBox = new HBox(5);
@@ -1949,7 +1968,7 @@ public class Main extends Application {
             knightIcon.setPreserveRatio(true);
             try { knightIcon.setImage(new Image(getClass().getResourceAsStream("/assets/bonus/largestarmy.png"))); } catch (Exception e) {}
             Label knightLabel = new Label(String.valueOf(numKnights));
-            knightLabel.setStyle("-fx-text-fill: #bdc3c7; -fx-font-weight: bold; -fx-font-size: 20px;");
+            knightLabel.setStyle("-fx-text-fill: #bdc3c7; -fx-font-weight: bold; -fx-font-size: 16px; -fx-min-width: 24px;");
             knightBox.getChildren().addAll(knightIcon, knightLabel);
 
             HBox roadBox = new HBox(5);
@@ -1959,7 +1978,7 @@ public class Main extends Application {
             roadIcon.setPreserveRatio(true);
             try { roadIcon.setImage(new Image(getClass().getResourceAsStream("/assets/bonus/longestroad.png"))); } catch (Exception e) {}
             Label roadLabel = new Label(String.valueOf(longestRoad));
-            roadLabel.setStyle("-fx-text-fill: #bdc3c7; -fx-font-weight: bold; -fx-font-size: 20px;");
+            roadLabel.setStyle("-fx-text-fill: #bdc3c7; -fx-font-weight: bold; -fx-font-size: 16px; -fx-min-width: 24px;");
             roadBox.getChildren().addAll(roadIcon, roadLabel);
 
             statsBox.getChildren().addAll(resBox, devBox, knightBox, roadBox);
