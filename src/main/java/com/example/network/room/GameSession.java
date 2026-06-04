@@ -37,6 +37,7 @@ public class GameSession {
 
     private final long seed;
     private final CatanGameManager manager;
+    private final BotLogic botLogic;
     private final Map<String, Vertex> vertexById = new HashMap<>();
     private final Map<String, Edge> edgeById = new HashMap<>();
     private final Map<String, com.example.model.board.Tile> tileById = new HashMap<>();
@@ -70,6 +71,7 @@ public class GameSession {
         // para que servidor e clientes usem exatamente a mesma sequência.
 
         this.manager = new CatanGameManager(board, players, logger);
+        this.botLogic = new BotLogic(manager);
 
         for (Vertex v : board.getVertices()) vertexById.put(v.getId(), v);
         for (Edge e : board.getEdges()) edgeById.put(e.getId(), e);
@@ -86,6 +88,23 @@ public class GameSession {
 
     public synchronized String getCurrentPlayerName() {
         return manager.getCurrentTurn().getCurrentPlayer().getName();
+    }
+
+    /**
+     * Se o jogador da vez for bot e estiver na fase principal/rolagem,
+     * executa o turno dele. Retorna true se um bot jogou.
+     */
+    public synchronized boolean runBotTurnIfNeeded() {
+        Player current = manager.getCurrentTurn().getCurrentPlayer();
+        if (current == null || !current.isBot()) return false;
+
+        ITurnState state = manager.getCurrentTurn().getState();
+        if (state instanceof com.example.model.state.MainState
+                || state instanceof com.example.model.state.WaitingRollState) {
+            botLogic.playMainTurn();
+            return true;
+        }
+        return false;
     }
 
     /**

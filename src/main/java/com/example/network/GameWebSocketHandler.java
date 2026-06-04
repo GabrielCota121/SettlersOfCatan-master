@@ -194,6 +194,8 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
                 .put("room", room.toInfo())
                 .put("seed", seed), null);
         broadcastPersonalizedState(room, game);
+        // Se o primeiro jogador da ordem for bot, ele já joga.
+        processBotTurns(room, game);
         broadcastRoomList();
         System.out.println("Partida iniciada na sala " + roomId + " (seed=" + seed + ")");
     }
@@ -213,6 +215,9 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
         if (applied) {
             // Notifica todos com estado atualizado
             broadcastPersonalizedState(room, game);
+
+            // Processa turnos de bots que sejam o jogador da vez, em sequência.
+            processBotTurns(room, game);
 
             // Se o estado mudou para WaitingDiscard, avisa explicitamente quem precisa descartar
             com.example.network.protocol.GameStateDTO snap = game.snapshot();
@@ -252,6 +257,18 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
         } else {
             sendTo(session,
                 NetworkMessage.of(MessageType.GAME_STATE).put("state", game.snapshot(sender)));
+        }
+    }
+
+    private void processBotTurns(Room room, GameSession game) {
+        int seguranca = 0;
+        while (game.isCurrentPlayerBot() && seguranca++ < 20) {
+            boolean jogou = game.runBotTurnIfNeeded();
+            if (!jogou) break; // bot em estado especial (setup/ladrão/descarte)
+
+            try { Thread.sleep(800); } catch (InterruptedException ignored) {}
+
+            broadcastPersonalizedState(room, game);
         }
     }
 
