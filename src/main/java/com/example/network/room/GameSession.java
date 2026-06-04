@@ -106,6 +106,12 @@ public class GameSession {
             return true;
         }
 
+        // Ladrão (rolou 7 ou jogou Knight)
+        if (state instanceof com.example.model.state.MoveRobberState) {
+            botLogic.playRobberTurn();
+            return true;
+        }
+
         // Turno normal
         if (state instanceof com.example.model.state.MainState
                 || state instanceof com.example.model.state.WaitingRollState) {

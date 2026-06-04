@@ -10,6 +10,7 @@ import com.example.model.game.ResourceType;
 import com.example.model.player.Player;
 import com.example.model.state.ITurnState;
 import com.example.model.state.MainState;
+import com.example.model.state.MoveRobberState;
 import com.example.model.state.SetupState;
 import com.example.model.state.WaitingRollState;
 
@@ -146,6 +147,108 @@ public class BotLogic {
             }
         }
         return total;
+    }
+
+    /**
+     * Executa a jogada de ladrão do bot: bloqueia o tile de maior produção
+     * do líder (mais pontos), evitando tiles onde o próprio bot tem construção.
+     * Depois rouba a vítima com mais cartas naquele tile.
+     */
+    public void playRobberTurn() {
+        ITurnState state = manager.getCurrentTurn().getState();
+        if (!(state instanceof MoveRobberState robberState)) {
+            return;
+        }
+        Player bot = manager.getCurrentTurn().getCurrentPlayer();
+
+        // 1. Acha o líder (mais pontos), excluindo o próprio bot
+        Player lider = null;
+        int maxPontos = -1;
+        for (Player p : manager.getPlayers()) {
+            if (p.equals(bot)) continue;
+            if (p.getVictoryPoints() > maxPontos) {
+                maxPontos = p.getVictoryPoints();
+                lider = p;
+            }
+        }
+
+        com.example.model.board.Tile tileAtual = manager.getRobber().getCurrentTile();
+
+        // 2. Escolhe o melhor tile para bloquear (líder tem construção, bot não tem)
+        com.example.model.board.Tile melhorTile = null;
+        int melhorProducao = -1;
+
+        for (com.example.model.board.Tile t : manager.getBoard().getTiles()) {
+            if (t.equals(tileAtual)) continue;
+            if (t.getResource() == ResourceType.DESERT) continue;
+
+            boolean liderTemAqui = false;
+            boolean botTemAqui = false;
+            for (Vertex v : t.getVertices()) {
+                if (!v.isEmpty()) {
+                    Player owner = v.getBuilding().getOwner();
+                    if (lider != null && owner.equals(lider)) liderTemAqui = true;
+                    if (owner.equals(bot)) botTemAqui = true;
+                }
+            }
+
+            if (liderTemAqui && !botTemAqui) {
+                int prod = valorProducao(t.getNumberToken());
+                if (prod > melhorProducao) {
+                    melhorProducao = prod;
+                    melhorTile = t;
+                }
+            }
+        }
+
+        // 3. Fallback: qualquer tile de maior produção onde o bot não tem construção
+        if (melhorTile == null) {
+            for (com.example.model.board.Tile t : manager.getBoard().getTiles()) {
+                if (t.equals(tileAtual)) continue;
+                if (t.getResource() == ResourceType.DESERT) continue;
+                boolean botTemAqui = false;
+                for (Vertex v : t.getVertices()) {
+                    if (!v.isEmpty() && v.getBuilding().getOwner().equals(bot)) {
+                        botTemAqui = true;
+                        break;
+                    }
+                }
+                if (!botTemAqui) {
+                    int prod = valorProducao(t.getNumberToken());
+                    if (prod > melhorProducao) {
+                        melhorProducao = prod;
+                        melhorTile = t;
+                    }
+                }
+            }
+        }
+
+        // 4. Último recurso: qualquer tile diferente do atual e não deserto
+        if (melhorTile == null) {
+            for (com.example.model.board.Tile t : manager.getBoard().getTiles()) {
+                if (!t.equals(tileAtual) && t.getResource() != ResourceType.DESERT) {
+                    melhorTile = t;
+                    break;
+                }
+            }
+        }
+
+        if (melhorTile == null) return;
+
+        // 5. Move o ladrão e rouba a vítima com mais cartas
+        List<Player> victims = robberState.moveRobber(melhorTile, manager.getCurrentTurn());
+        if (victims == null) return;
+
+        Player alvo = null;
+        int maxCartas = -1;
+        for (Player v : victims) {
+            int cartas = v.getWallet().getTotalCards();
+            if (cartas > maxCartas) {
+                maxCartas = cartas;
+                alvo = v;
+            }
+        }
+        robberState.executeSteal(alvo, manager.getCurrentTurn());
     }
 
     /**

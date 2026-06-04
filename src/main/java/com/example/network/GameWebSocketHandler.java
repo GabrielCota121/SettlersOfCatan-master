@@ -262,7 +262,7 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
 
     private void processBotTurns(Room room, GameSession game) {
         int seguranca = 0;
-        while (seguranca++ < 30) {
+        while (seguranca++ < 50) {
             boolean fezAlgo = false;
 
             // 1. Bots respondem (recusam) trocas pendentes
