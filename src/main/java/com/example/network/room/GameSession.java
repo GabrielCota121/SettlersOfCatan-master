@@ -99,6 +99,14 @@ public class GameSession {
         if (current == null || !current.isBot()) return false;
 
         ITurnState state = manager.getCurrentTurn().getState();
+
+        // Fase de setup
+        if (state instanceof com.example.model.state.SetupState) {
+            botLogic.playSetupTurn();
+            return true;
+        }
+
+        // Turno normal
         if (state instanceof com.example.model.state.MainState
                 || state instanceof com.example.model.state.WaitingRollState) {
             botLogic.playMainTurn();

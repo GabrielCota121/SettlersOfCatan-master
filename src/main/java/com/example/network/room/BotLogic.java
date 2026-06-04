@@ -1,6 +1,7 @@
 package com.example.network.room;
 
 import com.example.model.board.Edge;
+import com.example.model.board.Tile;
 import com.example.model.board.Vertex;
 import com.example.model.building.BuildingCost;
 import com.example.model.building.City;
@@ -9,6 +10,7 @@ import com.example.model.game.ResourceType;
 import com.example.model.player.Player;
 import com.example.model.state.ITurnState;
 import com.example.model.state.MainState;
+import com.example.model.state.SetupState;
 import com.example.model.state.WaitingRollState;
 
 import java.util.Map;
@@ -78,6 +80,68 @@ public class BotLogic {
 
         // 3. Passa a vez
         manager.getCurrentTurn().getState().endTurn(manager.getCurrentTurn());
+    }
+
+    /**
+     * Executa a jogada de setup do bot: coloca o settlement no melhor
+     * vértice livre e uma road adjacente válida.
+     */
+    public void playSetupTurn() {
+        ITurnState state = manager.getCurrentTurn().getState();
+        if (!(state instanceof SetupState setupState)) {
+            return;
+        }
+
+        // 1. Escolhe o vértice livre de maior produção que respeita a regra de distância.
+        Vertex melhor = null;
+        int melhorProducao = -1;
+        for (Vertex v : manager.getBoard().getVertices()) {
+            if (v.isEmpty() && v.respectsDistanceRule()) {
+                int prod = producaoDoVertice(v);
+                if (prod > melhorProducao) {
+                    melhorProducao = prod;
+                    melhor = v;
+                }
+            }
+        }
+        if (melhor == null) return;
+
+        // 2. Constrói o settlement
+        boolean ok = setupState.buildSettlement(melhor, manager.getCurrentTurn());
+        if (!ok) return;
+
+        // 3. Constrói uma road adjacente válida (deve sair do settlement recém-colocado).
+        //    SetupState.buildRoad já chama proceedTurn internamente.
+        for (Edge e : melhor.getAdjacentEdges()) {
+            if (e.isEmpty()) {
+                boolean roadOk = manager.getCurrentTurn().getState()
+                    .buildRoad(e, manager.getCurrentTurn());
+                if (roadOk) return;
+            }
+        }
+    }
+
+    /** Valor de produção de um número de dado (quantidade de pontinhos). */
+    private int valorProducao(int numberToken) {
+        return switch (numberToken) {
+            case 2, 12 -> 1;
+            case 3, 11 -> 2;
+            case 4, 10 -> 3;
+            case 5, 9  -> 4;
+            case 6, 8  -> 5;
+            default    -> 0; // 7 ou deserto
+        };
+    }
+
+    /** Produção total de um vértice = soma do valor de produção de todos os tiles adjacentes. */
+    private int producaoDoVertice(Vertex v) {
+        int total = 0;
+        for (Tile t : v.getAdjacentTiles()) {
+            if (t.getResource() != ResourceType.DESERT) {
+                total += valorProducao(t.getNumberToken());
+            }
+        }
+        return total;
     }
 
     // ── Helpers ────────────────────────────────────────────────
