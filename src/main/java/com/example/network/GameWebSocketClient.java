@@ -148,13 +148,13 @@ public class GameWebSocketClient {
     }
 
     public void startGame() {
-        startGame(false);
+        startGame(0);
     }
 
-    public void startGame(boolean fillWithBots) {
+    public void startGame(int numBots) {
         send(NetworkMessage.of(MessageType.START_GAME)
             .room(currentRoomId)
-            .put("fillWithBots", fillWithBots));
+            .put("numBots", numBots));
     }
 
     // ----------------- Conveniências de jogo -----------------

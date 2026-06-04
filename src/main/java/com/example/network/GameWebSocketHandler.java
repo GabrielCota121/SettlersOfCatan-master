@@ -175,11 +175,12 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
             return;
         }
 
-        boolean fillWithBots = msg.getBoolean("fillWithBots", false);
+        int numBots = msg.getInt("numBots", 0);
+        boolean fillWithBots = numBots > 0;
 
         if (fillWithBots) {
             if (!room.allHumansReady()) {
-                sendTo(session, error("Todos os jogadores humanos precisam estar prontos."));
+                sendTo(session, error("Os jogadores humanos precisam estar prontos."));
                 return;
             }
         } else {
@@ -190,7 +191,7 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
         }
 
         if (fillWithBots) {
-            room.fillWithBots();
+            room.addBots(numBots);
         }
         room.setStatus(RoomStatus.IN_GAME);
 
@@ -277,21 +278,20 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
         while (seguranca++ < 50) {
             boolean fezAlgo = false;
 
-            // 1. Bots respondem (recusam) trocas pendentes
             if (game.runBotTradeResponsesIfNeeded()) {
                 fezAlgo = true;
                 broadcastTradeUpdate(room, game);
             }
-
-            // 2. Bots descartam cartas se necessário (dado 7)
             if (game.runBotDiscardsIfNeeded()) {
                 fezAlgo = true;
                 broadcastPersonalizedState(room, game);
             }
-
-            // 3. Bot joga turno normal/setup se for a vez dele
             if (game.isCurrentPlayerBot()) {
+                System.out.println("[BOT] Vez do bot: "
+                    + game.getCurrentPlayerName()
+                    + " | estado: " + game.getCurrentStateName());
                 boolean jogou = game.runBotTurnIfNeeded();
+                System.out.println("[BOT] runBotTurnIfNeeded retornou: " + jogou);
                 if (jogou) {
                     fezAlgo = true;
                     try { Thread.sleep(800); } catch (InterruptedException ignored) {}

@@ -90,6 +90,10 @@ public class GameSession {
         return manager.getCurrentTurn().getCurrentPlayer().getName();
     }
 
+    public synchronized String getCurrentStateName() {
+        return manager.getCurrentTurn().getState().getName();
+    }
+
     /**
      * Se o jogador da vez for bot e estiver na fase principal/rolagem,
      * executa o turno dele. Retorna true se um bot jogou.

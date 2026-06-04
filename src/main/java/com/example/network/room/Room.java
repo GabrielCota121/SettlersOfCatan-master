@@ -86,16 +86,39 @@ public class Room {
     }
 
     /** Valida só os humanos: pelo menos 1 humano (o host) e todos prontos.
+     *  O host não precisa marcar "ready" (ele dispara o início).
      *  Usado quando o host escolhe completar vagas com bots. */
     public synchronized boolean allHumansReady() {
+        String hostId = getHostSessionId();
         int humanos = 0;
         for (RoomPlayer p : players) {
             if (!p.isBot()) {
                 humanos++;
-                if (!p.isReady()) return false;
+                boolean ehHost = p.getSessionId().equals(hostId);
+                if (!ehHost && !p.isReady()) return false;
             }
         }
         return humanos >= 1;
+    }
+
+    /** Adiciona exatamente n bots (até o limite de vagas da sala). */
+    public synchronized void addBots(int n) {
+        String[] cores = {"RED", "BLUE", "GREEN", "ORANGE", "PURPLE", "BLACK"};
+        java.util.Set<String> usadas = new java.util.HashSet<>();
+        for (RoomPlayer p : players) usadas.add(p.getColor());
+        int botNum = 1;
+        int adicionados = 0;
+        while (adicionados < n && players.size() < maxPlayers) {
+            String cor = null;
+            for (String c : cores) {
+                if (!usadas.contains(c)) { cor = c; break; }
+            }
+            if (cor == null) break;
+            usadas.add(cor);
+            String nome = "Bot " + botNum++;
+            players.add(new RoomPlayer("BOT-" + nome, nome, cor, true));
+            adicionados++;
+        }
     }
 
     /** Cópia imutável da lista de jogadores, segura para iterar fora do lock. */
