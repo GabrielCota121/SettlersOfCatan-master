@@ -116,6 +116,60 @@ public class GameSession {
     }
 
     /**
+     * Faz todos os BOTS pendentes de descarte descartarem cartas aleatórias.
+     * Retorna true se algum bot descartou.
+     */
+    public synchronized boolean runBotDiscardsIfNeeded() {
+        ITurnState state = manager.getCurrentTurn().getState();
+        if (!(state instanceof com.example.model.state.WaitingDiscardState discardState)) {
+            return false;
+        }
+        boolean algumDescartou = false;
+        List<Player> pendentes = new ArrayList<>(discardState.getPendingPlayers());
+        for (Player p : pendentes) {
+            if (p.isBot()) {
+                Map<com.example.model.game.ResourceType, Integer> descarte =
+                    botLogic.escolherDescarteAleatorio(p);
+                discardState.submitDiscard(p, descarte, manager.getCurrentTurn());
+                algumDescartou = true;
+            }
+        }
+        return algumDescartou;
+    }
+
+    /**
+     * Faz todos os BOTS com resposta PENDING em uma troca ativa recusarem.
+     * Retorna true se algum bot respondeu.
+     */
+    public synchronized boolean runBotTradeResponsesIfNeeded() {
+        if (activeTrade == null || !activeTrade.isActive()) return false;
+        boolean algumRespondeu = false;
+        for (Player p : manager.getPlayers()) {
+            if (p.isBot()
+                    && !p.getName().equals(activeTrade.getProposerName())
+                    && "PENDING".equals(activeTrade.getResponses().get(p.getName()))) {
+                activeTrade.getResponses().put(p.getName(), "DECLINED");
+                algumRespondeu = true;
+            }
+        }
+        if (algumRespondeu) {
+            boolean todosResponderam = activeTrade.getResponses().values().stream()
+                .noneMatch("PENDING"::equals);
+            boolean alguemAceitou = activeTrade.getResponses().values().stream()
+                .anyMatch("ACCEPTED"::equals);
+            if (todosResponderam && !alguemAceitou) {
+                manager.getLogger().log("Todos recusaram a troca de "
+                    + activeTrade.getProposerName() + ".");
+                activeTrade.setActive(false);
+                activeTrade.setResolvedWithPlayer(null);
+                lastResolvedTrade = activeTrade;
+                activeTrade = null;
+            }
+        }
+        return algumRespondeu;
+    }
+
+    /**
      * Monta um TradeStatusDTO inicial a partir de uma proposta de troca.
      * Todos os não-proponentes começam como PENDING.
      */

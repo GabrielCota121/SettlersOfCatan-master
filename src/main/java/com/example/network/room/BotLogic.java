@@ -13,6 +13,10 @@ import com.example.model.state.MainState;
 import com.example.model.state.SetupState;
 import com.example.model.state.WaitingRollState;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.EnumMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -142,6 +146,33 @@ public class BotLogic {
             }
         }
         return total;
+    }
+
+    /**
+     * Faz um bot específico descartar cartas aleatórias até atingir a
+     * quantidade exigida (metade da mão, arredondada para baixo).
+     * Retorna o mapa de descarte escolhido.
+     */
+    public Map<ResourceType, Integer> escolherDescarteAleatorio(Player bot) {
+        int total = bot.getWallet().getTotalCards();
+        int aDescartar = total / 2;
+
+        Map<ResourceType, Integer> descarte = new EnumMap<>(ResourceType.class);
+
+        List<ResourceType> disponiveis = new ArrayList<>();
+        for (ResourceType rt : ResourceType.values()) {
+            if (rt == ResourceType.DESERT) continue;
+            int qtd = bot.getWallet().getResourceAmount(rt);
+            for (int i = 0; i < qtd; i++) disponiveis.add(rt);
+        }
+
+        Collections.shuffle(disponiveis);
+
+        for (int i = 0; i < aDescartar && i < disponiveis.size(); i++) {
+            ResourceType rt = disponiveis.get(i);
+            descarte.merge(rt, 1, Integer::sum);
+        }
+        return descarte;
     }
 
     // ── Helpers ────────────────────────────────────────────────

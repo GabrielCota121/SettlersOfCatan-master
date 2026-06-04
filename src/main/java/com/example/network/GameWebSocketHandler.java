@@ -262,13 +262,49 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
 
     private void processBotTurns(Room room, GameSession game) {
         int seguranca = 0;
-        while (game.isCurrentPlayerBot() && seguranca++ < 20) {
-            boolean jogou = game.runBotTurnIfNeeded();
-            if (!jogou) break; // bot em estado especial (setup/ladrão/descarte)
+        while (seguranca++ < 30) {
+            boolean fezAlgo = false;
 
-            try { Thread.sleep(800); } catch (InterruptedException ignored) {}
+            // 1. Bots respondem (recusam) trocas pendentes
+            if (game.runBotTradeResponsesIfNeeded()) {
+                fezAlgo = true;
+                broadcastTradeUpdate(room, game);
+            }
 
-            broadcastPersonalizedState(room, game);
+            // 2. Bots descartam cartas se necessário (dado 7)
+            if (game.runBotDiscardsIfNeeded()) {
+                fezAlgo = true;
+                broadcastPersonalizedState(room, game);
+            }
+
+            // 3. Bot joga turno normal/setup se for a vez dele
+            if (game.isCurrentPlayerBot()) {
+                boolean jogou = game.runBotTurnIfNeeded();
+                if (jogou) {
+                    fezAlgo = true;
+                    try { Thread.sleep(800); } catch (InterruptedException ignored) {}
+                    broadcastPersonalizedState(room, game);
+                }
+            }
+
+            if (!fezAlgo) break;
+        }
+    }
+
+    private void broadcastTradeUpdate(Room room, GameSession game) {
+        com.example.network.protocol.GameStateDTO snap = game.snapshot();
+        if (snap.getActiveTrade() != null) {
+            broadcastToRoom(room,
+                NetworkMessage.of(MessageType.TRADE_UPDATE)
+                    .put("trade", snap.getActiveTrade()), null);
+        } else {
+            com.example.network.protocol.TradeStatusDTO resolved =
+                game.consumeLastResolvedTrade();
+            if (resolved != null) {
+                broadcastToRoom(room,
+                    NetworkMessage.of(MessageType.TRADE_UPDATE)
+                        .put("trade", resolved), null);
+            }
         }
     }
 
