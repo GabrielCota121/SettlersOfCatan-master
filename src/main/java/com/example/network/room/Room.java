@@ -85,6 +85,19 @@ public class Room {
         return true;
     }
 
+    /** Valida só os humanos: pelo menos 1 humano (o host) e todos prontos.
+     *  Usado quando o host escolhe completar vagas com bots. */
+    public synchronized boolean allHumansReady() {
+        int humanos = 0;
+        for (RoomPlayer p : players) {
+            if (!p.isBot()) {
+                humanos++;
+                if (!p.isReady()) return false;
+            }
+        }
+        return humanos >= 1;
+    }
+
     /** Cópia imutável da lista de jogadores, segura para iterar fora do lock. */
     public synchronized List<RoomPlayer> snapshotPlayers() {
         return new ArrayList<>(players);

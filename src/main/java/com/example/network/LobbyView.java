@@ -154,10 +154,13 @@ public class LobbyView {
         controls.getChildren().add(leaveBtn);
 
         if (iAmHost) {
+            CheckBox fillBotsCheck = new CheckBox("Completar vagas com bots");
+            fillBotsCheck.setStyle("-fx-text-fill: white;");
+
             Button startBtn = new Button("Iniciar partida");
             startBtn.setStyle("-fx-base: #2ecc71; -fx-font-weight: bold;");
-            startBtn.setOnAction(e -> client.startGame());
-            controls.getChildren().add(startBtn);
+            startBtn.setOnAction(e -> client.startGame(fillBotsCheck.isSelected()));
+            controls.getChildren().addAll(fillBotsCheck, startBtn);
         } else {
             ToggleButton readyBtn = new ToggleButton(iAmReady ? "Pronto ✅" : "Marcar pronto");
             readyBtn.setSelected(iAmReady);

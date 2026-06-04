@@ -75,7 +75,7 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
                 case MessageType.JOIN_ROOM   -> handleJoinRoom(session, msg);
                 case MessageType.LEAVE_ROOM  -> handleLeaveRoom(session);
                 case MessageType.SET_READY   -> handleSetReady(session, msg);
-                case MessageType.START_GAME  -> handleStartGame(session);
+                case MessageType.START_GAME  -> handleStartGame(session, msg);
                 case MessageType.GAME_ACTION -> handleGameAction(session, msg);
                 default -> sendTo(session, error("Tipo desconhecido: " + type));
             }
@@ -167,19 +167,31 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
         broadcastToRoom(room, NetworkMessage.of(MessageType.ROOM_UPDATE).put("room", room.toInfo()), null);
     }
 
-    private void handleStartGame(WebSocketSession session) {
+    private void handleStartGame(WebSocketSession session, NetworkMessage msg) {
         Room room = currentRoom(session);
         if (room == null) return;
         if (!room.isHost(session.getId())) {
             sendTo(session, error("Apenas o host pode iniciar a partida."));
             return;
         }
-        if (!room.allReady()) {
-            sendTo(session, error("Todos os jogadores precisam estar prontos (mínimo 2)."));
-            return;
+
+        boolean fillWithBots = msg.getBoolean("fillWithBots", false);
+
+        if (fillWithBots) {
+            if (!room.allHumansReady()) {
+                sendTo(session, error("Todos os jogadores humanos precisam estar prontos."));
+                return;
+            }
+        } else {
+            if (!room.allReady()) {
+                sendTo(session, error("Todos os jogadores precisam estar prontos (mínimo 2)."));
+                return;
+            }
         }
-        // Se a sala não está cheia, completa as vagas com bots
-        room.fillWithBots();
+
+        if (fillWithBots) {
+            room.fillWithBots();
+        }
         room.setStatus(RoomStatus.IN_GAME);
 
         // Instancia a partida AUTORITATIVA da sala. A seed determina o tabuleiro,
