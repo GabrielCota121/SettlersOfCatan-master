@@ -1670,7 +1670,53 @@ public class Main extends Application {
         return null;
     }
 
+    private void drawShore(GraphicsContext gc, Board board) {
+        List<Edge> boundaryEdges = new ArrayList<>();
+        for (Edge edge : board.getEdges()) {
+            if (isBoundaryEdge(edge)) {
+                boundaryEdges.add(edge);
+            }
+        }
+
+        gc.save();
+        gc.setLineJoin(javafx.scene.shape.StrokeLineJoin.ROUND);
+        gc.setLineCap(javafx.scene.shape.StrokeLineCap.ROUND);
+
+        // 1. Camada Base (Areia Molhada / Sombra)
+        gc.setStroke(Color.web("#c4af7a")); 
+        gc.setLineWidth(200); 
+        for (Edge e : boundaryEdges) {
+            gc.strokeLine(e.getV1().getX(), e.getV1().getY(), e.getV2().getX(), e.getV2().getY());
+        }
+
+        // 2. Camada Principal (Areia Seca)
+        gc.setStroke(Color.web("#e3c996")); 
+        gc.setLineWidth(160);
+        for (Edge e : boundaryEdges) {
+            gc.strokeLine(e.getV1().getX(), e.getV1().getY(), e.getV2().getX(), e.getV2().getY());
+        }
+
+        // 3. Camada de Detalhe (Topo da Duna / Brilho)
+        gc.setStroke(Color.web("#f5e6be", 0.6)); 
+        gc.setLineWidth(60);
+        for (Edge e : boundaryEdges) {
+            gc.strokeLine(e.getV1().getX(), e.getV1().getY(), e.getV2().getX(), e.getV2().getY());
+        }
+        gc.restore();
+    }
+
+    private boolean isBoundaryEdge(Edge edge) {
+        int tileCount = 0;
+        for (Tile t : edge.getV1().getAdjacentTiles()) {
+            if (edge.getV2().getAdjacentTiles().contains(t)) {
+                tileCount++;
+            }
+        }
+        return tileCount == 1;
+    }
+
     private void drawBoard(GraphicsContext gc, Board board) {
+        drawShore(gc, board);
         drawTiles(gc, board);
         drawPorts(gc, board);
         drawEdges(gc, board);
@@ -1766,33 +1812,38 @@ public class Main extends Application {
                 double cx = computeCenterX(landTile.getVertices());
                 double cy = computeCenterY(landTile.getVertices());
 
+                // Vetor normal apontando para o mar
                 double dx = mx - cx;
                 double dy = my - cy;
                 double length = Math.hypot(dx, dy);
                 if (length > 0) { dx /= length; dy /= length; }
 
-                double edgeDx = v2.getX() - v1.getX();
-                double edgeDy = v2.getY() - v1.getY();
-                double edgeAngle = Math.toDegrees(Math.atan2(edgeDy, edgeDx));
-
-                while (edgeAngle < 0) edgeAngle += 180;
-                while (edgeAngle >= 180) edgeAngle -= 180;
-
-                String dockKey = "0";
-                if (Math.abs(edgeAngle - 90) < 15) dockKey = "0";
-                else if (Math.abs(edgeAngle - 30) < 15 || Math.abs(edgeAngle - 210) < 15) dockKey = "-30";
-                else if (Math.abs(edgeAngle - 150) < 15 || Math.abs(edgeAngle - 330) < 15) dockKey = "30";
-
-                double dockOffset = 50.0;
-                double dockX = mx + dx * dockOffset;
-                double dockY = my + dy * dockOffset;
-
-                Image dImg = dockImages.get(dockKey);
-                if (dImg != null) gc.drawImage(dImg, dockX - dImg.getWidth() / 2.0, dockY - dImg.getHeight() / 2.0);
-
+                // Calcula o centro exato do barco
                 double portDist = 260.0;
                 double px = mx + dx * portDist;
                 double py = my + dy * portDist;
+
+                Image dImg = dockImages.get("0"); 
+                if (dImg != null) {
+                    // Pier 1: Apontando diretamente do vértice 1 para o centro do barco
+                    double angle1 = Math.toDegrees(Math.atan2(py - v1.getY(), px - v1.getX())) - 90;
+                    gc.save();
+                    gc.translate(v1.getX(), v1.getY());
+                    gc.rotate(angle1);
+                    gc.translate(0, 15);
+                    double scale = 0.55;
+                    gc.drawImage(dImg, - (dImg.getWidth() * scale) / 2.0, 0, dImg.getWidth() * scale, dImg.getHeight() * scale);
+                    gc.restore();
+
+                    // Pier 2: Apontando diretamente do vértice 2 para o centro do barco
+                    double angle2 = Math.toDegrees(Math.atan2(py - v2.getY(), px - v2.getX())) - 90;
+                    gc.save();
+                    gc.translate(v2.getX(), v2.getY());
+                    gc.rotate(angle2);
+                    gc.translate(0, 15);
+                    gc.drawImage(dImg, - (dImg.getWidth() * scale) / 2.0, 0, dImg.getWidth() * scale, dImg.getHeight() * scale);
+                    gc.restore();
+                }
 
                 String portName = (port.getResource() == null) ? "3to1port.png" : port.getResource().name().toLowerCase() + "port.png";
                 Image pImg = portImages.get(portName);
