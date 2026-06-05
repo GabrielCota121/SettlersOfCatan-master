@@ -817,6 +817,37 @@ public class GameSession {
         }
         dto.setBank(bank);
 
+        // Quando o jogo acabou, anexa as estatísticas para o overlay final
+        if (dto.getWinnerName() != null) {
+            com.example.model.game.StatisticsManager sm = manager.getStatisticsManager();
+            com.example.network.protocol.StatisticsDTO stats =
+                new com.example.network.protocol.StatisticsDTO();
+            stats.setTotalTurns(sm.getTotalTurns());
+            stats.setDiceRollCounts(new java.util.HashMap<>(sm.getDiceRollCounts()));
+
+            java.util.Map<String, java.util.Map<String, Integer>> recursos = new java.util.HashMap<>();
+            java.util.Map<String, Integer> devs = new java.util.HashMap<>();
+            java.util.Map<String, Integer> bankT = new java.util.HashMap<>();
+            java.util.Map<String, Integer> playerT = new java.util.HashMap<>();
+
+            for (Player p : manager.getPlayers()) {
+                java.util.Map<String, Integer> porRecurso = new java.util.HashMap<>();
+                for (java.util.Map.Entry<com.example.model.game.ResourceType, Integer> e
+                        : sm.getResourcesGainedBy(p).entrySet()) {
+                    porRecurso.put(e.getKey().name(), e.getValue());
+                }
+                recursos.put(p.getName(), porRecurso);
+                devs.put(p.getName(), sm.getDevCardsDrawnBy(p));
+                bankT.put(p.getName(), sm.getBankTradesBy(p));
+                playerT.put(p.getName(), sm.getPlayerTradesBy(p));
+            }
+            stats.setResourcesGained(recursos);
+            stats.setDevCardsDrawn(devs);
+            stats.setBankTrades(bankT);
+            stats.setPlayerTrades(playerT);
+            dto.setStatistics(stats);
+        }
+
         return dto;
     }
 }

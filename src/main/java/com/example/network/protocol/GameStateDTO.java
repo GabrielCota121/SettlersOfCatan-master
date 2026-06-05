@@ -97,4 +97,8 @@ public class GameStateDTO {
 
     public TradeStatusDTO getActiveTrade() { return activeTrade; }
     public void setActiveTrade(TradeStatusDTO v) { this.activeTrade = v; }
+
+    private StatisticsDTO statistics;
+    public StatisticsDTO getStatistics() { return statistics; }
+    public void setStatistics(StatisticsDTO v) { this.statistics = v; }
 }
