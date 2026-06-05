@@ -94,6 +94,9 @@ public class Main extends Application {
     private Player myPlayer = null;
     // jogador local deste cliente — definido em startGame quando online
 
+    private Vertex hoverVertex = null;
+    private Edge hoverEdge = null;
+
     private double zoomLevel = 0.18;
     private double offsetX = 60;
     private double offsetY = 0;
@@ -337,21 +340,14 @@ public class Main extends Application {
 
         HBox diceBox = new HBox(5, dice1View, dice2View);
         diceBox.setAlignment(javafx.geometry.Pos.CENTER);
+        diceBox.setStyle("-fx-padding: 6;"
+            + "-fx-background-color: rgba(255,255,255,0.08);"
+            + "-fx-background-radius: 8;");
 
         Label diceResultLabel = new Label("");
         diceResultLabel.setStyle("-fx-text-fill: #f1c40f; -fx-font-size: " + diceFontSize + "px; -fx-font-weight: bold;");
 
-        int rollBtnFont = Math.max(12, (int)(BOTTOM_H * 0.10));
-        Button rollDiceBtn = new Button("🎲  Rolar Dados");
-        rollDiceBtn.setStyle(
-                "-fx-background-color: #27ae60;" +
-                "-fx-text-fill: white;" +
-                "-fx-font-size: " + rollBtnFont + "px;" +
-                "-fx-font-weight: bold;" +
-                "-fx-padding: 6 14 6 14;" +
-                "-fx-background-radius: 8;");
-
-        VBox diceWithResult = new VBox(4, diceBox, diceResultLabel, rollDiceBtn);
+        VBox diceWithResult = new VBox(4, diceBox, diceResultLabel);
         diceWithResult.setAlignment(javafx.geometry.Pos.CENTER);
 
         ImageView tradeIconView = new ImageView(tradeImg);
@@ -471,14 +467,7 @@ public class Main extends Application {
 
             boolean canRoll = state.canRollDice();
             diceBox.setOpacity(canRoll ? 1.0 : 0.3);
-            rollDiceBtn.setDisable(!canRoll);
-            rollDiceBtn.setStyle(
-                    "-fx-background-color: " + (canRoll ? "#27ae60" : "#555") + ";" +
-                    "-fx-text-fill: white;" +
-                    "-fx-font-size: " + rollBtnFont + "px;" +
-                    "-fx-font-weight: bold;" +
-                    "-fx-padding: 6 14 6 14;" +
-                    "-fx-background-radius: 8;");
+            diceBox.setCursor(canRoll ? javafx.scene.Cursor.HAND : javafx.scene.Cursor.DEFAULT);
 
             boolean isMainState = state instanceof MainState;
             tradeButtonPane.setOpacity(isMainState ? 1.0 : 0.3);
@@ -530,7 +519,7 @@ public class Main extends Application {
             updateActionUI.run();
         };
 
-        rollDiceBtn.setOnAction(e -> {
+        diceBox.setOnMouseClicked(e -> {
             if (online) { gameClient.sendIntent("ROLL_DICE", null); return; }
             Player currentPlayer = gameManager.getCurrentTurn().getCurrentPlayer();
             boolean success = gameManager.rollDice(currentPlayer);
@@ -665,6 +654,26 @@ public class Main extends Application {
                 }
             }
             render(gc, board, true);
+        });
+
+        canvas.setOnMouseMoved(e -> {
+            double worldX = (e.getX() - offsetX) / zoomLevel;
+            double worldY = (e.getY() - offsetY) / zoomLevel;
+            Vertex v = findVertexAt(board, worldX, worldY);
+            Edge edge = (v == null) ? findEdgeAt(board, worldX, worldY) : null;
+            if (v != hoverVertex || edge != hoverEdge) {
+                hoverVertex = v;
+                hoverEdge = edge;
+                render(gc, board, true);
+            }
+        });
+
+        canvas.setOnMouseExited(e -> {
+            if (hoverVertex != null || hoverEdge != null) {
+                hoverVertex = null;
+                hoverEdge = null;
+                render(gc, board, true);
+            }
         });
 
         rightSidebar = new VBox(15);
@@ -1603,6 +1612,25 @@ public class Main extends Application {
 
         drawBoard(gc, board);
         gc.restore();
+
+        // Bolinha de hover: exibida somente quando é a vez do jogador local
+        boolean minhaVez = gameManager != null && (!online ||
+            (myPlayer != null
+             && myPlayer.equals(gameManager.getCurrentTurn().getCurrentPlayer())));
+        if (minhaVez && (hoverVertex != null || hoverEdge != null)) {
+            gc.setFill(javafx.scene.paint.Color.rgb(255, 255, 255, 0.45));
+            if (hoverVertex != null) {
+                double vx = hoverVertex.getX() * zoomLevel + offsetX;
+                double vy = hoverVertex.getY() * zoomLevel + offsetY;
+                double r = 12;
+                gc.fillOval(vx - r, vy - r, r * 2, r * 2);
+            } else if (hoverEdge != null) {
+                double mx = ((hoverEdge.getV1().getX() + hoverEdge.getV2().getX()) / 2) * zoomLevel + offsetX;
+                double my = ((hoverEdge.getV1().getY() + hoverEdge.getV2().getY()) / 2) * zoomLevel + offsetY;
+                double r = 9;
+                gc.fillOval(mx - r, my - r, r * 2, r * 2);
+            }
+        }
     }
 
     private void loadAssets() {
