@@ -408,6 +408,8 @@ public class GameSession {
                 manager.getLogger().log("Troca: " + senderName + " deu "
                     + activeTrade.getGive() + " e recebeu " + activeTrade.getWant()
                     + " de " + partner);
+                manager.getStatisticsManager().recordPlayerTrade(proposer);
+                manager.getStatisticsManager().recordPlayerTrade(partnerPlayer);
 
                 activeTrade.setActive(false);
                 activeTrade.setResolvedWithPlayer(partner);
@@ -485,6 +487,7 @@ public class GameSession {
                     }
                     manager.getLogger().log(player.getName() + " trocou com o banco: deu "
                         + giveMap + " e recebeu " + receiveMap + ".");
+                    manager.getStatisticsManager().recordBankTrade(player);
                     return true;
                 } catch (Exception e) {
                     System.out.println("Erro em BANK_TRADE: " + e.getMessage());

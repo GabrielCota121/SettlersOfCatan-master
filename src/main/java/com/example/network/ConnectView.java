@@ -45,7 +45,24 @@ public class ConnectView {
     public Pane getRoot() { return root; }
 
     private void build(Consumer<GameWebSocketClient> onConnected) {
-        root.setStyle("-fx-background-color: #1a252f;");
+        try {
+            javafx.scene.image.Image bg = new javafx.scene.image.Image(
+                getClass().getResourceAsStream(
+                    "/assets/background/background_catan.jpeg"));
+            if (bg.isError()) throw new RuntimeException("erro ao carregar bg");
+            javafx.scene.layout.BackgroundImage bgImg =
+                new javafx.scene.layout.BackgroundImage(
+                    bg,
+                    javafx.scene.layout.BackgroundRepeat.NO_REPEAT,
+                    javafx.scene.layout.BackgroundRepeat.NO_REPEAT,
+                    javafx.scene.layout.BackgroundPosition.CENTER,
+                    new javafx.scene.layout.BackgroundSize(
+                        1.0, 1.0, true, true, false, true));
+            root.setBackground(new javafx.scene.layout.Background(bgImg));
+        } catch (Exception e) {
+            System.out.println("Background não encontrado: " + e.getMessage());
+            root.setStyle("-fx-background-color: #1a252f;");
+        }
 
         // ---- título ----
         Label title = new Label("Settlers of Catan");
@@ -138,13 +155,13 @@ public class ConnectView {
                 connectBtn, statusLabel,
                 spLabel, spRow);
         form.setAlignment(Pos.CENTER_LEFT);
-        form.setMaxWidth(520);
-        form.setPadding(new Insets(30));
-        form.setStyle("-fx-background-color: #2c3e50; -fx-background-radius: 12;");
 
         VBox center = new VBox(24, title, subtitle, form);
         center.setAlignment(Pos.CENTER);
-        center.setPadding(new Insets(60));
+        center.setStyle("-fx-background-color: rgba(20, 28, 38, 0.82);"
+            + "-fx-background-radius: 18; -fx-padding: 36;");
+        center.setMaxWidth(580);
+        center.setMaxHeight(javafx.scene.layout.Region.USE_PREF_SIZE);
         root.setCenter(center);
     }
 

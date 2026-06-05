@@ -2470,6 +2470,12 @@ public class Main extends Application {
                 gameClient.sendIntent("STEAL_FROM", victim.getName()));
             rightSidebar.getChildren().add(btn);
         }
+
+        Separator sep = new Separator();
+        sep.setStyle("-fx-padding: 12 0 6 0;");
+        rightSidebar.getChildren().add(sep);
+
+        buildPlayerOverviewSidebar();
     }
 
     private double computeCenterX(Vertex[] vertices) {
