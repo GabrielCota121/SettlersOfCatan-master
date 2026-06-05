@@ -31,7 +31,6 @@ public class MoveRobberState implements ITurnState {
         Robber robber = manager.getRobber();
 
         if (newTile.equals(robber.getCurrentTile())) {
-            manager.getLogger().log("O Robber deve ser movido para um tile diferente do atual, gênio!");
             return null;
         }
 

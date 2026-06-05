@@ -58,19 +58,13 @@ public class PlayerHandView extends HBox {
 
             Label qtyLabel = new Label("0");
             qtyLabel.setStyle(
-                    "-fx-background-color: #e74c3c; " +
-                    "-fx-text-fill: white; " +
-                    "-fx-font-weight: bold; " +
-                    "-fx-font-size: " + fontSize + "px; " +
-                    "-fx-padding: 1 5 1 5; " +
-                    "-fx-background-radius: 10; " +
-                    "-fx-border-color: white; " +
-                    "-fx-border-radius: 10; " +
-                    "-fx-border-width: 1.5;");
+                    "-fx-text-fill: white; -fx-font-weight: bold; -fx-font-size: 16px;" +
+                    "-fx-background-color: rgba(0,0,0,0.6); -fx-background-radius: 8;" +
+                    "-fx-padding: 1 6 1 6;");
 
             StackPane cardPane = new StackPane(imageView, qtyLabel);
-            StackPane.setAlignment(qtyLabel, Pos.BOTTOM_RIGHT);
-            StackPane.setMargin(qtyLabel, new Insets(0, 0, 8, 0));
+            StackPane.setAlignment(qtyLabel, Pos.TOP_CENTER);
+            StackPane.setMargin(qtyLabel, new Insets(4, 0, 0, 0));
 
             quantityLabels.put(type, qtyLabel);
             this.getChildren().add(cardPane);

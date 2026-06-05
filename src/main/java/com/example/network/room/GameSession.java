@@ -483,6 +483,8 @@ public class GameSession {
                         player.getWallet().addResource(rt, e.getValue());
                         manager.getBank().getWallet().removeResource(rt, e.getValue());
                     }
+                    manager.getLogger().log(player.getName() + " trocou com o banco: deu "
+                        + giveMap + " e recebeu " + receiveMap + ".");
                     return true;
                 } catch (Exception e) {
                     System.out.println("Erro em BANK_TRADE: " + e.getMessage());

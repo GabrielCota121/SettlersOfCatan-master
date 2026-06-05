@@ -1980,8 +1980,7 @@ public class Main extends Application {
             infoBox.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
 
             Label nameLabel = new Label(p.getName()
-                + (isCurrent ? "  (jogando)" : "")
-                + (isLocal ? "  (voce)" : ""));
+                + (isCurrent ? "  (jogando)" : ""));
             nameLabel.setStyle("-fx-text-fill: white; -fx-font-weight: bold; -fx-font-size: 20px;");
 
             int numResources = p.getWallet().getTotalCards();
@@ -2080,8 +2079,8 @@ public class Main extends Application {
         box.getChildren().add(title);
 
         // Resumo da oferta
-        Label offerLabel = new Label("Você oferece: " + trade.getGive()
-            + "\nVocê quer: " + trade.getWant());
+        Label offerLabel = new Label("Oferece: " + trade.getGive()
+            + "\nQuer: " + trade.getWant());
         offerLabel.setStyle("-fx-text-fill: #bdc3c7; -fx-font-size: 12px; -fx-wrap-text: true;");
         box.getChildren().add(offerLabel);
 
@@ -2138,8 +2137,8 @@ public class Main extends Application {
         Label title = new Label(trade.getProposerName() + " propôs uma troca:");
         title.setStyle("-fx-text-fill: #f1c40f; -fx-font-size: 14px; -fx-font-weight: bold;");
 
-        Label offerLabel = new Label("Ele oferece: " + trade.getGive()
-            + "\nEle quer: " + trade.getWant());
+        Label offerLabel = new Label("Oferece: " + trade.getGive()
+            + "\nQuer: " + trade.getWant());
         offerLabel.setStyle("-fx-text-fill: #bdc3c7; -fx-font-size: 12px;" +
                             "-fx-wrap-text: true;");
 
