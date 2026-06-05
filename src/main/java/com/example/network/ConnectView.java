@@ -29,7 +29,16 @@ public class ConnectView {
     private final Label statusLabel = new Label();
     private final Button connectBtn = new Button("Conectar");
 
+    private final java.util.function.IntConsumer onSinglePlayer;
+
     public ConnectView(Consumer<GameWebSocketClient> onConnected) {
+        this.onSinglePlayer = null;
+        build(onConnected);
+    }
+
+    public ConnectView(Consumer<GameWebSocketClient> onConnected,
+                       java.util.function.IntConsumer onSinglePlayer) {
+        this.onSinglePlayer = onSinglePlayer;
         build(onConnected);
     }
 
@@ -99,10 +108,35 @@ public class ConnectView {
             t.start();
         });
 
+        // ---- single player ----
+        Label spLabel = new Label("Ou jogue sozinho contra bots:");
+        spLabel.setStyle("-fx-text-fill: #bdc3c7; -fx-font-size: 13px;");
+
+        Label botsLabel = new Label("Bots:");
+        botsLabel.setStyle("-fx-text-fill: white;");
+        javafx.scene.control.Spinner<Integer> botsSpinner =
+            new javafx.scene.control.Spinner<>(1, 3, 3);
+        botsSpinner.setPrefWidth(70);
+
+        Button singleBtn = new Button("🎮 Jogar Sozinho");
+        singleBtn.setStyle("-fx-background-color: #9b59b6; -fx-text-fill: white;"
+            + "-fx-font-weight: bold; -fx-font-size: 15px; -fx-padding: 8 24;"
+            + "-fx-background-radius: 8; -fx-cursor: hand;");
+        singleBtn.setOnAction(e -> {
+            if (onSinglePlayer != null) {
+                setConnecting(true, "Iniciando partida local com bots…");
+                onSinglePlayer.accept(botsSpinner.getValue());
+            }
+        });
+
+        HBox spRow = new HBox(10, botsLabel, botsSpinner, singleBtn);
+        spRow.setAlignment(Pos.CENTER_LEFT);
+
         // ---- layout ----
         VBox form = new VBox(14,
                 urlLabel, urlField, hint,
-                connectBtn, statusLabel);
+                connectBtn, statusLabel,
+                spLabel, spRow);
         form.setAlignment(Pos.CENTER_LEFT);
         form.setMaxWidth(520);
         form.setPadding(new Insets(30));

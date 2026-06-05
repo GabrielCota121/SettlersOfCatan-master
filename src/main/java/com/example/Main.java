@@ -119,12 +119,16 @@ public class Main extends Application {
         SIDEBAR_W = (int) Math.min(340, screen.getWidth() * 0.20); // ~20 % da largura, máx 340 px
         BOTTOM_H  = (int) Math.min(170, screen.getHeight() * 0.20); // ~20 % da altura, máx 170 px
 
-        ConnectView connectView = new ConnectView(client -> {
-            this.gameClient = client;
-            LobbyView lobby = new LobbyView(gameClient, (room, seed) -> startGame(primaryStage, room, seed));
-            primaryStage.setTitle("Catan — Lobby");
-            primaryStage.getScene().setRoot(lobby.getRoot());
-        });
+        ConnectView connectView = new ConnectView(
+            client -> {
+                this.gameClient = client;
+                LobbyView lobby = new LobbyView(gameClient,
+                    (room, seed) -> startGame(primaryStage, room, seed));
+                primaryStage.setTitle("Catan — Lobby");
+                primaryStage.getScene().setRoot(lobby.getRoot());
+            },
+            numBots -> startSinglePlayer(primaryStage, numBots)
+        );
 
         Scene scene = new Scene(connectView.getRoot(), WIDTH, HEIGHT);
         primaryStage.setTitle("Catan — Conectar");
@@ -133,6 +137,57 @@ public class Main extends Application {
         primaryStage.setScene(scene);
         primaryStage.setMaximized(true);
         primaryStage.show();
+    }
+
+    private void startSinglePlayer(Stage primaryStage, int numBots) {
+        Thread t = new Thread(() -> {
+            try {
+                com.example.network.EmbeddedServer.startIfNeeded();
+
+                // Pequena espera para o endpoint WebSocket ficar pronto
+                Thread.sleep(1500);
+
+                GameWebSocketClient client = new GameWebSocketClient();
+                client.setPlayerName("Você");
+                boolean ok = client.connect("ws://127.0.0.1:8080/catan");
+                if (!ok) {
+                    javafx.application.Platform.runLater(() ->
+                        new javafx.scene.control.Alert(
+                            javafx.scene.control.Alert.AlertType.ERROR,
+                            "Não foi possível iniciar o servidor local."
+                        ).showAndWait());
+                    return;
+                }
+                this.gameClient = client;
+
+                // Configura o handler ANTES de criar a sala para não perder GAME_STARTED
+                client.setOnMessage(msg -> {
+                    if (com.example.network.protocol.MessageType.GAME_STARTED
+                            .equals(msg.getType())) {
+                        long seed = msg.getLong("seed", 0L);
+                        RoomInfo room = objectMapper.convertValue(
+                            msg.getData().get("room"), RoomInfo.class);
+                        javafx.application.Platform.runLater(() ->
+                            startGame(primaryStage, room, seed));
+                    }
+                });
+
+                // Cria a sala e inicia com os bots escolhidos
+                client.createRoom("Single Player", 4, "RED");
+                Thread.sleep(600);
+                client.startGame(numBots);
+
+            } catch (Exception ex) {
+                ex.printStackTrace();
+                javafx.application.Platform.runLater(() ->
+                    new javafx.scene.control.Alert(
+                        javafx.scene.control.Alert.AlertType.ERROR,
+                        "Erro ao iniciar single player: " + ex.getMessage()
+                    ).showAndWait());
+            }
+        }, "single-player-init");
+        t.setDaemon(true);
+        t.start();
     }
 
     /** Monta a cena do jogo a partir dos jogadores da sala (ou padrões, se offline).
