@@ -30,7 +30,20 @@ public class MainState implements ITurnState {
         }
         Bank bank = currentTurn.getGameManager().getBank();
 
-        if (!vertex.isEmpty() || !vertex.respectsDistanceRule() || !vertex.hasConnectingRoadFor(activePlayer)) return false;
+        if (!vertex.isEmpty()) {
+            gameManager.getLogger().log("Já existe uma construção nesse local!");
+            return false;
+        }
+        if (!vertex.respectsDistanceRule()) {
+            gameManager.getLogger().log(
+                "Muito perto de outra construção! Deixe ao menos 1 vértice de distância.");
+            return false;
+        }
+        if (!vertex.hasConnectingRoadFor(activePlayer)) {
+            gameManager.getLogger().log(
+                "Você precisa de uma estrada sua conectada a esse local para construir!");
+            return false;
+        }
 
         if (activePlayer.getWallet().payCost(BuildingCost.SETTLEMENT.getCost())) {
             bank.receiveResources(BuildingCost.SETTLEMENT.getCost());
@@ -49,22 +62,30 @@ public class MainState implements ITurnState {
             checkWinCondition(currentTurn);
             return true;
         }
+        gameManager.getLogger().log(
+            "Recursos insuficientes para o settlement (precisa de 1 madeira, 1 tijolo, 1 ovelha e 1 trigo).");
         return false;
     }
 
     @Override
     public boolean buildCity(Vertex vertex, Turn currentTurn) {
-        if (vertex.isEmpty()) return false;
-
+        CatanGameManager gameManager = currentTurn.getGameManager();
         Player activePlayer = currentTurn.getCurrentPlayer();
-        if(activePlayer.getNumCities() == 4){
-            currentTurn.getGameManager().getLogger().log(activePlayer.getName() + " já tem 4 cities construidas!!");
+
+        if (vertex.isEmpty()) {
+            gameManager.getLogger().log("Você só pode evoluir para cidade um settlement seu!");
             return false;
         }
-        Bank bank = currentTurn.getGameManager().getBank();
+
+        if(activePlayer.getNumCities() == 4){
+            gameManager.getLogger().log(activePlayer.getName() + " já tem 4 cities construidas!!");
+            return false;
+        }
+        Bank bank = gameManager.getBank();
 
         VertexBuilding currentBuilding = vertex.getBuilding();
         if (!(currentBuilding instanceof Settlement) || !currentBuilding.getOwner().equals(activePlayer)) {
+            gameManager.getLogger().log("Você só pode evoluir para cidade um settlement seu!");
             return false;
         }
 
@@ -74,29 +95,37 @@ public class MainState implements ITurnState {
             activePlayer.decrementSettlements();
             activePlayer.incrementCities();
             activePlayer.incrementVictoryPoints();
-            currentTurn.getGameManager().getLogger().log(activePlayer.getName() + " construiu uma city!!");
+            gameManager.getLogger().log(activePlayer.getName() + " construiu uma city!!");
             checkWinCondition(currentTurn);
             return true;
         }
+        gameManager.getLogger().log(
+            "Recursos insuficientes para a cidade (precisa de 2 trigos e 3 minérios).");
         return false;
     }
 
     @Override
     public boolean buildRoad(Edge edge, Turn currentTurn) {
         CatanGameManager gameManager = currentTurn.getGameManager();
-        if (!edge.isEmpty()) return false;
 
-        Player activePlayer = currentTurn.getCurrentPlayer();
-        if(activePlayer.getNumRoads() == 15){
-            currentTurn.getGameManager().getLogger().log(activePlayer.getName() + " já tem 15 roads construidas!!");
+        if (!edge.isEmpty()) {
+            gameManager.getLogger().log("Já existe uma estrada nesse local!");
             return false;
         }
 
-        Bank bank = currentTurn.getGameManager().getBank();
+        Player activePlayer = currentTurn.getCurrentPlayer();
+        if(activePlayer.getNumRoads() == 15){
+            gameManager.getLogger().log(activePlayer.getName() + " já tem 15 roads construidas!!");
+            return false;
+        }
+
+        Bank bank = gameManager.getBank();
         boolean connectsToOwnBuilding = edge.hasConnectingSettlementOrCityFor(activePlayer);
         boolean connectsToValidRoad = canConnectViaRoad(edge, activePlayer);
 
         if (!connectsToOwnBuilding && !connectsToValidRoad) {
+            gameManager.getLogger().log(
+                "A estrada precisa se conectar a uma construção ou estrada sua!");
             return false;
         }
 
@@ -105,10 +134,12 @@ public class MainState implements ITurnState {
             edge.setBuilding(new Road(activePlayer, edge));
             activePlayer.incrementRoads();
             gameManager.getLogger().log(activePlayer.getName() + " construiu uma road!!");
-            currentTurn.getGameManager().getRoadBonus().updateLongestRoad(activePlayer, currentTurn.getGameManager().getBoard().getEdges());
+            gameManager.getRoadBonus().updateLongestRoad(activePlayer, gameManager.getBoard().getEdges());
             checkWinCondition(currentTurn);
             return true;
         }
+        gameManager.getLogger().log(
+            "Recursos insuficientes para a estrada (precisa de 1 madeira e 1 tijolo).");
         return false;
     }
 
