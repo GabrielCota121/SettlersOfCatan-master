@@ -100,6 +100,7 @@ public class Main extends Application {
     private VBox overlayContent;
     private int activeOverlayTab = 0;
     private StatisticsDTO lastStatistics;
+    private Stage primaryStageRef;
 
     private Vertex hoverVertex = null;
     private Edge hoverEdge = null;
@@ -119,13 +120,23 @@ public class Main extends Application {
 
     @Override
     public void start(Stage primaryStage) {
-        // Calcula dimensões com base na tela real — funciona em qualquer resolução.
         javafx.geometry.Rectangle2D screen = Screen.getPrimary().getVisualBounds();
         WIDTH    = (int) screen.getWidth();
         HEIGHT   = (int) screen.getHeight();
-        SIDEBAR_W = (int) Math.min(340, screen.getWidth() * 0.20); // ~20 % da largura, máx 340 px
-        BOTTOM_H  = (int) Math.min(170, screen.getHeight() * 0.20); // ~20 % da altura, máx 170 px
+        SIDEBAR_W = (int) Math.min(340, screen.getWidth() * 0.20);
+        BOTTOM_H  = (int) Math.min(170, screen.getHeight() * 0.20);
 
+        this.primaryStageRef = primaryStage;
+        Scene scene = new Scene(new javafx.scene.layout.Pane(), WIDTH, HEIGHT);
+        primaryStage.setMinWidth(900);
+        primaryStage.setMinHeight(600);
+        primaryStage.setScene(scene);
+        primaryStage.setMaximized(true);
+        primaryStage.show();
+        showConnectScreen(primaryStage);
+    }
+
+    private void showConnectScreen(Stage primaryStage) {
         ConnectView connectView = new ConnectView(
             client -> {
                 this.gameClient = client;
@@ -136,14 +147,23 @@ public class Main extends Application {
             },
             numBots -> startSinglePlayer(primaryStage, numBots)
         );
-
-        Scene scene = new Scene(connectView.getRoot(), WIDTH, HEIGHT);
         primaryStage.setTitle("Catan — Conectar");
-        primaryStage.setMinWidth(900);
-        primaryStage.setMinHeight(600);
-        primaryStage.setScene(scene);
-        primaryStage.setMaximized(true);
-        primaryStage.show();
+        primaryStage.getScene().setRoot(connectView.getRoot());
+    }
+
+    private void resetGameState() {
+        if (overlayPane != null && overlayPane.getParent() instanceof javafx.scene.layout.Pane p) {
+            p.getChildren().remove(overlayPane);
+        }
+        overlayPane = null;
+        if (gameClient != null) {
+            try { gameClient.disconnect(); } catch (Exception ignored) {}
+            gameClient = null;
+        }
+        try { com.example.network.EmbeddedServer.stop(); } catch (Exception ignored) {}
+        lastStatistics = null;
+        myPlayer = null;
+        online = false;
     }
 
     private void startSinglePlayer(Stage primaryStage, int numBots) {
@@ -2482,12 +2502,16 @@ public class Main extends Application {
         header.setStyle("-fx-background-color: #16202c; -fx-padding: 20 24 16 24;"
             + "-fx-background-radius: 14 14 0 0;");
         header.setAlignment(javafx.geometry.Pos.CENTER);
-        Label titleLabel = new Label("🏆  " + winner.getName() + " venceu!");
+        HBox titleRow = new HBox(12);
+        titleRow.setAlignment(javafx.geometry.Pos.CENTER);
+        javafx.scene.image.ImageView trophyIcon = statIcon("trophy.png", 48);
+        Label titleLabel = new Label(winner.getName() + " venceu!");
         titleLabel.setStyle("-fx-text-fill: #f1c40f; -fx-font-size: 26px; -fx-font-weight: bold;");
+        titleRow.getChildren().addAll(trophyIcon, titleLabel);
         int turnCount = lastStatistics != null ? lastStatistics.getTotalTurns() : 0;
         Label subtitleLabel = new Label("Turnos jogados: " + turnCount);
         subtitleLabel.setStyle("-fx-text-fill: #7f8c8d; -fx-font-size: 14px;");
-        header.getChildren().addAll(titleLabel, subtitleLabel);
+        header.getChildren().addAll(titleRow, subtitleLabel);
 
         String[] tabNames = {"Visão Geral", "Dados", "Recursos", "Dev Cards"};
         HBox tabBar = new HBox(0);
@@ -2522,9 +2546,14 @@ public class Main extends Application {
             }
         };
 
+        String[] tabIcons = {"tab-overview.png", "tab-dice.png",
+            "tab-resources.png", "tab-devcards.png"};
+
         for (int i = 0; i < tabNames.length; i++) {
             final int idx = i;
             tabButtons[i] = new Button(tabNames[i]);
+            tabButtons[i].setGraphic(statIcon(tabIcons[i], 18));
+            tabButtons[i].setContentDisplay(javafx.scene.control.ContentDisplay.LEFT);
             tabButtons[i].setOnAction(e -> {
                 activeOverlayTab = idx;
                 refreshTabs.run();
@@ -2536,13 +2565,23 @@ public class Main extends Application {
         // Aba 0: Visão Geral
         renderTab[0] = () -> {
             overlayContent.getChildren().clear();
-            for (Player p : gameManager.getPlayers()) {
+            List<Player> ordenados = new ArrayList<>(gameManager.getPlayers());
+            ordenados.sort((a, b) -> b.getVictoryPoints() - a.getVictoryPoints());
+            int[] posicao = {0};
+            for (Player p : ordenados) {
+                posicao[0]++;
                 HBox row = new HBox(20);
                 row.setStyle("-fx-background-color: #2c3e50; -fx-padding: 12 16 12 16;"
                     + "-fx-background-radius: 8;");
                 row.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
-                Label rank = new Label(p.equals(winner) ? "🥇" : "");
-                rank.setStyle("-fx-font-size: 20px;");
+                javafx.scene.Node rankNode;
+                if (posicao[0] <= 3) {
+                    rankNode = statIcon("medal-" + posicao[0] + ".png", 32);
+                } else {
+                    Label lbl = new Label(posicao[0] + "º");
+                    lbl.setStyle("-fx-text-fill: #7f8c8d; -fx-font-size: 14px;");
+                    rankNode = lbl;
+                }
                 VBox nameBox = new VBox(2);
                 Label pname = new Label(p.getName());
                 pname.setStyle("-fx-text-fill: white; -fx-font-size: 16px; -fx-font-weight: bold;");
@@ -2551,14 +2590,14 @@ public class Main extends Application {
                 nameBox.getChildren().addAll(pname, pcolor);
                 HBox statsRow = new HBox(20);
                 statsRow.getChildren().addAll(
-                    makeStatBlock("VP", String.valueOf(p.getVictoryPoints()), "Pontos"),
-                    makeStatBlock("S", String.valueOf(p.getNumSettlements()), "Sett."),
-                    makeStatBlock("C", String.valueOf(p.getNumCities()), "Cidades"),
-                    makeStatBlock("R", String.valueOf(p.getNumRoads()), "Estradas"),
-                    makeStatBlock("K", String.valueOf(p.getNumKnights()), "Knights"));
+                    makeStatBlockIcon("vp-star.png", String.valueOf(p.getVictoryPoints()), "Pontos"),
+                    makeStatBlockIcon("icon-settlement.png", String.valueOf(p.getNumSettlements()), "Sett."),
+                    makeStatBlockIcon("icon-city.png", String.valueOf(p.getNumCities()), "Cidades"),
+                    makeStatBlockIcon("icon-road.png", String.valueOf(p.getNumRoads()), "Estradas"),
+                    makeStatBlockIcon("icon-knight.png", String.valueOf(p.getNumKnights()), "Knights"));
                 javafx.scene.layout.Region rowSpacer = new javafx.scene.layout.Region();
                 HBox.setHgrow(rowSpacer, javafx.scene.layout.Priority.ALWAYS);
-                row.getChildren().addAll(rank, nameBox, rowSpacer, statsRow);
+                row.getChildren().addAll(rankNode, nameBox, rowSpacer, statsRow);
                 overlayContent.getChildren().add(row);
             }
         };
@@ -2624,9 +2663,9 @@ public class Main extends Application {
                     Label pname = new Label(p.getName());
                     pname.setStyle("-fx-text-fill: white; -fx-font-weight: bold; -fx-min-width: 120px;");
                     row.getChildren().addAll(pname,
-                        makeStatBlock("Dev", String.valueOf(devs), "Dev Cards"),
-                        makeStatBlock("Bnk", String.valueOf(bt), "Tr. Banco"),
-                        makeStatBlock("Jog", String.valueOf(pt), "Tr. Jogador"));
+                        makeStatBlockIcon("tab-devcards.png", String.valueOf(devs), "Dev Cards"),
+                        makeStatBlockIcon("tab-resources.png", String.valueOf(bt), "Tr. Banco"),
+                        makeStatBlockIcon("icon-robber.png", String.valueOf(pt), "Tr. Jogador"));
                     overlayContent.getChildren().add(row);
                 }
             }
@@ -2635,9 +2674,54 @@ public class Main extends Application {
         refreshTabs.run();
         renderTab[0].run();
 
-        card.getChildren().addAll(header, tabBar, scrollPane);
+        HBox footer = new HBox(12);
+        footer.setStyle("-fx-background-color: #16202c; -fx-padding: 16 24 20 24;"
+            + "-fx-background-radius: 0 0 14 14;");
+        footer.setAlignment(javafx.geometry.Pos.CENTER);
+
+        Button menuBtn = new Button("Voltar ao Menu");
+        menuBtn.setStyle("-fx-background-color: #3498db; -fx-text-fill: white;"
+            + "-fx-font-weight: bold; -fx-font-size: 14px; -fx-padding: 10 24;"
+            + "-fx-background-radius: 8; -fx-cursor: hand;");
+        menuBtn.setOnAction(e -> {
+            resetGameState();
+            showConnectScreen(primaryStageRef);
+        });
+
+        footer.getChildren().add(menuBtn);
+        card.getChildren().addAll(header, tabBar, scrollPane, footer);
         overlayPane.getChildren().add(card);
         gameSceneRoot.getChildren().add(overlayPane);
+    }
+
+    private javafx.scene.image.ImageView statIcon(String fileName, double size) {
+        javafx.scene.image.ImageView iv = new javafx.scene.image.ImageView();
+        try {
+            javafx.scene.image.Image img = new javafx.scene.image.Image(
+                getClass().getResourceAsStream("/assets/stats/" + fileName));
+            iv.setImage(img);
+            iv.setFitWidth(size);
+            iv.setFitHeight(size);
+            iv.setPreserveRatio(true);
+        } catch (Exception e) {
+            System.out.println("Ícone não encontrado: " + fileName);
+        }
+        return iv;
+    }
+
+    private VBox makeStatBlockIcon(String iconFile, String value, String label) {
+        VBox box = new VBox(3);
+        box.setAlignment(javafx.geometry.Pos.CENTER);
+        box.setMinWidth(58);
+        HBox top = new HBox(4);
+        top.setAlignment(javafx.geometry.Pos.CENTER);
+        Label valLabel = new Label(value);
+        valLabel.setStyle("-fx-text-fill: white; -fx-font-size: 15px; -fx-font-weight: bold;");
+        top.getChildren().addAll(statIcon(iconFile, 20), valLabel);
+        Label l = new Label(label);
+        l.setStyle("-fx-text-fill: #7f8c8d; -fx-font-size: 10px;");
+        box.getChildren().addAll(top, l);
+        return box;
     }
 
     private VBox makeStatBlock(String icon, String value, String label) {
