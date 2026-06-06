@@ -76,4 +76,33 @@ class TradeOfferTest {
         assertFalse(offer.canPlayerAfford(otherPlayer));
     }
 
+    @Test
+    void exceptionWhenBothOfferedAndRequestedAreEmpty() {
+        Map<ResourceType, Integer> empty = Map.of();
+
+        assertThrows(IllegalArgumentException.class, () -> new TradeOffer(proposer, empty, empty));
+    }
+
+    @Test
+    void getProposerReturnsCorrectPlayer() {
+        TradeOffer offer = new TradeOffer(proposer, Map.of(ResourceType.WOOD, 1), Map.of(ResourceType.ORE, 1));
+
+        assertEquals(proposer, offer.getProposer());
+    }
+
+    @Test
+    void getOfferedResourcesReturnsCorrectMap() {
+        Map<ResourceType, Integer> offered = Map.of(ResourceType.WOOD, 1);
+        TradeOffer offer = new TradeOffer(proposer, offered, Map.of(ResourceType.ORE, 1));
+
+        assertEquals(offered, offer.getOfferedResources());
+    }
+
+    @Test
+    void getRequestedResourcesReturnsCorrectMap() {
+        Map<ResourceType, Integer> requested = Map.of(ResourceType.ORE, 1);
+        TradeOffer offer = new TradeOffer(proposer, Map.of(ResourceType.WOOD, 1), requested);
+
+        assertEquals(requested, offer.getRequestedResources());
+    }
 }
