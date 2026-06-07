@@ -272,6 +272,7 @@ public class Main extends Application {
             public void log(String message) {
                 Platform.runLater(() -> {
                     logArea.appendText("🎲 " + message + "\n");
+                    if (!online) tocarSomDoEvento(message);
                 });
             }
         };
@@ -919,7 +920,10 @@ public class Main extends Application {
                     }
                     case MessageType.GAME_EVENT -> {
                         String evMsg = msg.getString("message");
-                        Platform.runLater(() -> logArea.appendText("🎲 " + evMsg + "\n"));
+                        Platform.runLater(() -> {
+                            logArea.appendText("🎲 " + evMsg + "\n");
+                            tocarSomDoEvento(evMsg);
+                        });
                     }
                     case MessageType.TRADE_UPDATE -> {
                         com.example.network.protocol.TradeStatusDTO trade =
@@ -965,6 +969,7 @@ public class Main extends Application {
             }
         };
         fpsTimer.start();
+        SoundManager.play("gamestart");
         primaryStage.show();
     }
 
@@ -2740,6 +2745,34 @@ public class Main extends Application {
         l.setStyle("-fx-text-fill: #7f8c8d; -fx-font-size: 10px;");
         box.getChildren().addAll(v, l);
         return box;
+    }
+
+    private void tocarSomDoEvento(String msg) {
+        if (msg == null) return;
+        String m = msg.toLowerCase();
+        if (m.contains("rolou: 7") || m.contains("rolou 7")) {
+            SoundManager.play("rolou7");
+        } else if (m.contains("rolou")) {
+            SoundManager.play("roladado");
+        } else if (m.contains("construiu um settlement")) {
+            SoundManager.play("settlement");
+        } else if (m.contains("construiu uma road") || (m.contains("construiu") && m.contains("estrada"))) {
+            SoundManager.play("road");
+        } else if (m.contains("construiu uma city") || m.contains("cidade")) {
+            SoundManager.play("city");
+        } else if (m.contains("jogou um knight") || (m.contains("usou") && m.contains("knight"))) {
+            SoundManager.play("knight");
+        } else if (m.contains("longest road")) {
+            SoundManager.play("longestroad");
+        } else if (m.contains("largest army")) {
+            SoundManager.play("largestarmy");
+        } else if (m.contains("robber movido") || m.contains("mova o robber") || m.contains("move o robber")) {
+            SoundManager.play("robbermoved");
+        } else if (m.contains("venceu") || m.contains("fim do jogo")) {
+            SoundManager.play("gameend");
+        } else if (myPlayer != null && m.contains("vez de") && m.contains(myPlayer.getName().toLowerCase())) {
+            SoundManager.play("suavez");
+        }
     }
 
     public static void main(String[] args) {

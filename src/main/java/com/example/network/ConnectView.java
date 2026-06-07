@@ -47,17 +47,17 @@ public class ConnectView {
     private void build(Consumer<GameWebSocketClient> onConnected) {
         try {
             javafx.scene.image.Image bg = new javafx.scene.image.Image(
-                getClass().getResourceAsStream(
-                    "/assets/background/background_catan.jpeg"));
+                    getClass().getResourceAsStream(
+                            "/assets/background/background_catan.jpeg"));
             if (bg.isError()) throw new RuntimeException("erro ao carregar bg");
             javafx.scene.layout.BackgroundImage bgImg =
-                new javafx.scene.layout.BackgroundImage(
-                    bg,
-                    javafx.scene.layout.BackgroundRepeat.NO_REPEAT,
-                    javafx.scene.layout.BackgroundRepeat.NO_REPEAT,
-                    javafx.scene.layout.BackgroundPosition.CENTER,
-                    new javafx.scene.layout.BackgroundSize(
-                        1.0, 1.0, true, true, false, true));
+                    new javafx.scene.layout.BackgroundImage(
+                            bg,
+                            javafx.scene.layout.BackgroundRepeat.NO_REPEAT,
+                            javafx.scene.layout.BackgroundRepeat.NO_REPEAT,
+                            javafx.scene.layout.BackgroundPosition.CENTER,
+                            new javafx.scene.layout.BackgroundSize(
+                                    1.0, 1.0, true, true, false, true));
             root.setBackground(new javafx.scene.layout.Background(bgImg));
         } catch (Exception e) {
             System.out.println("Background não encontrado: " + e.getMessage());
@@ -65,24 +65,24 @@ public class ConnectView {
         }
 
         // ---- título ----
-        Label title = new Label("Settlers of Catan");
-        title.setFont(Font.font("Georgia", FontWeight.BOLD, 38));
+        Label title = new Label("Bem-vindo à Ilha de Catan!");
+        title.setFont(Font.font("Georgia", FontWeight.BOLD, 32));
         title.setTextFill(Color.web("#f0c040"));
 
-        Label subtitle = new Label("Conectar ao servidor");
-        subtitle.setFont(Font.font("Georgia", 18));
-        subtitle.setTextFill(Color.web("#bdc3c7"));
+        //Label subtitle = new Label("Conectar ao servidor");
+        //subtitle.setFont(Font.font("Georgia", 18));
+        //subtitle.setTextFill(Color.web("#bdc3c7"));
 
         // ---- campo URL ----
-        Label urlLabel = label("Endereço do servidor:");
+        Label urlLabel = label("Para jogar online, insira o IP ou URL ngrok do host:");
         TextField urlField = new TextField(DEFAULT_LOCAL);
         urlField.setPromptText("ws://127.0.0.1:8080/catan  ou  https://xxxx.ngrok-free.app");
         urlField.setPrefWidth(480);
         urlField.setStyle("-fx-font-size: 14px;");
 
         // ---- dica ngrok ----
-        Label hint = new Label("Para jogar com amigos em outras máquinas, use sua URL do ngrok aqui.");
-        hint.setStyle("-fx-text-fill: #7f8c8d; -fx-font-size: 12px; -fx-font-style: italic;");
+        //Label hint = new Label("Para jogar online, insira o IP ou URL do ngrok aqui.");
+        //hint.setStyle("-fx-text-fill: #7f8c8d; -fx-font-size: 12px; -fx-font-style: italic;");
 
         // ---- status ----
         statusLabel.setStyle("-fx-text-fill: #f39c12; -fx-font-size: 14px;");
@@ -126,22 +126,22 @@ public class ConnectView {
         });
 
         // ---- single player ----
-        Label spLabel = new Label("Ou jogue sozinho contra bots:");
+        Label spLabel = new Label("Singleplayer contra bots :");
         spLabel.setStyle("-fx-text-fill: #bdc3c7; -fx-font-size: 13px;");
 
         Label botsLabel = new Label("Bots:");
         botsLabel.setStyle("-fx-text-fill: white;");
         javafx.scene.control.Spinner<Integer> botsSpinner =
-            new javafx.scene.control.Spinner<>(1, 3, 3);
+                new javafx.scene.control.Spinner<>(1, 3, 3);
         botsSpinner.setPrefWidth(70);
 
-        Button singleBtn = new Button("🎮 Jogar Sozinho");
+        Button singleBtn = new Button("Jogar");
         singleBtn.setStyle("-fx-background-color: #9b59b6; -fx-text-fill: white;"
-            + "-fx-font-weight: bold; -fx-font-size: 15px; -fx-padding: 8 24;"
-            + "-fx-background-radius: 8; -fx-cursor: hand;");
+                + "-fx-font-weight: bold; -fx-font-size: 15px; -fx-padding: 8 24;"
+                + "-fx-background-radius: 8; -fx-cursor: hand;");
         singleBtn.setOnAction(e -> {
             if (onSinglePlayer != null) {
-                setConnecting(true, "Iniciando partida local com bots…");
+                setConnecting(true, "Iniciando partida com bots…");
                 onSinglePlayer.accept(botsSpinner.getValue());
             }
         });
@@ -151,18 +151,19 @@ public class ConnectView {
 
         // ---- layout ----
         VBox form = new VBox(14,
-                urlLabel, urlField, hint,
+                urlLabel, urlField,
                 connectBtn, statusLabel,
                 spLabel, spRow);
         form.setAlignment(Pos.CENTER_LEFT);
 
-        VBox center = new VBox(24, title, subtitle, form);
+        VBox center = new VBox(24, title, form);
         center.setAlignment(Pos.CENTER);
         center.setStyle("-fx-background-color: rgba(20, 28, 38, 0.82);"
-            + "-fx-background-radius: 18; -fx-padding: 36;");
+                + "-fx-background-radius: 18; -fx-padding: 36;");
         center.setMaxWidth(580);
         center.setMaxHeight(javafx.scene.layout.Region.USE_PREF_SIZE);
         root.setCenter(center);
+        BorderPane.setMargin(center, new Insets(180, 0, 0, 0));
     }
 
     private void setConnecting(boolean connecting, String message) {

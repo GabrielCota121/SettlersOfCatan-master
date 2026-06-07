@@ -294,7 +294,7 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
                 System.out.println("[BOT] runBotTurnIfNeeded retornou: " + jogou);
                 if (jogou) {
                     fezAlgo = true;
-                    try { Thread.sleep(800); } catch (InterruptedException ignored) {}
+                    try { Thread.sleep(1000); } catch (InterruptedException ignored) {}
                     broadcastPersonalizedState(room, game);
                 }
             }

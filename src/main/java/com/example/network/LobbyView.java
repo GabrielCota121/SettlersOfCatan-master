@@ -61,7 +61,23 @@ public class LobbyView {
 
     private void buildRoomListScreen() {
         currentRoom = null;
-        root.setStyle("-fx-background-color: #2c3e50;");
+        try {
+            javafx.scene.image.Image bg = new javafx.scene.image.Image(
+                getClass().getResourceAsStream(
+                    "/assets/background/background_catan.jpeg"));
+            if (bg.isError()) throw new RuntimeException("erro bg");
+            javafx.scene.layout.BackgroundImage bgImg =
+                new javafx.scene.layout.BackgroundImage(
+                    bg,
+                    javafx.scene.layout.BackgroundRepeat.NO_REPEAT,
+                    javafx.scene.layout.BackgroundRepeat.NO_REPEAT,
+                    javafx.scene.layout.BackgroundPosition.CENTER,
+                    new javafx.scene.layout.BackgroundSize(
+                        1.0, 1.0, true, true, false, true));
+            root.setBackground(new javafx.scene.layout.Background(bgImg));
+        } catch (Exception e) {
+            root.setStyle("-fx-background-color: #2c3e50;");
+        }
 
         Label title = new Label("Ilha de Catan — Lobby");
         title.setStyle("-fx-text-fill: white; -fx-font-size: 28px; -fx-font-weight: bold;");
@@ -106,14 +122,14 @@ public class LobbyView {
 
         ScrollPane scroll = new ScrollPane(roomListContainer);
         scroll.setFitToWidth(true);
-        scroll.setStyle("-fx-background: #2c3e50; -fx-background-color: #2c3e50;");
+        scroll.setStyle("-fx-background: transparent; -fx-background-color: rgba(44,62,80,0.7);");
         VBox.setVgrow(scroll, Priority.ALWAYS);
 
         statusLabel.setStyle("-fx-text-fill: #f1c40f; -fx-font-size: 14px;");
 
         VBox content = new VBox(15, title, identityRow, createRow, new Separator(), listHeader, scroll, statusLabel);
         content.setPadding(new Insets(25));
-        content.setStyle("-fx-background-color: #2c3e50;");
+        content.setStyle("-fx-background-color: rgba(44,62,80,0.85); -fx-background-radius: 14;");
         root.setCenter(content);
         startRefresh();
     }
@@ -176,7 +192,7 @@ public class LobbyView {
 
         VBox content = new VBox(15, title, sub, new Separator(), playersBox, controls, statusLabel);
         content.setPadding(new Insets(25));
-        content.setStyle("-fx-background-color: #2c3e50;");
+        content.setStyle("-fx-background-color: rgba(44,62,80,0.85); -fx-background-radius: 14;");
         root.setCenter(content);
     }
 
