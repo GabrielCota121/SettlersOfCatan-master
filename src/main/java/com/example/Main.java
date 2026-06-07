@@ -149,9 +149,11 @@ public class Main extends Application {
         );
         primaryStage.setTitle("Catan — Conectar");
         primaryStage.getScene().setRoot(connectView.getRoot());
+        com.example.SoundManager.playMusic("mainmenubackground");
     }
 
     private void resetGameState() {
+        com.example.SoundManager.stopMusic();
         if (overlayPane != null && overlayPane.getParent() instanceof javafx.scene.layout.Pane p) {
             p.getChildren().remove(overlayPane);
         }
@@ -970,6 +972,7 @@ public class Main extends Application {
         };
         fpsTimer.start();
         SoundManager.play("gamestart");
+        com.example.SoundManager.playMusic("gamebackground");
         primaryStage.show();
     }
 
