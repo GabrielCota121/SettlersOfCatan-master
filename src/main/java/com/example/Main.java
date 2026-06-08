@@ -2261,6 +2261,12 @@ public class Main extends Application {
         box.getChildren().add(cancelBtn);
 
         rightSidebar.getChildren().add(box);
+
+        // Mantém o overview do jogo (placar e banco) visível durante a troca
+        Separator sep = new Separator();
+        sep.setStyle("-fx-padding: 12 0 6 0;");
+        rightSidebar.getChildren().add(sep);
+        buildPlayerOverviewSidebar();
     }
 
     private void buildTradeResponderSidebar(
@@ -2325,6 +2331,12 @@ public class Main extends Application {
         }
 
         rightSidebar.getChildren().add(box);
+
+        // Mantém o overview do jogo (placar e banco) visível durante a troca
+        Separator sep = new Separator();
+        sep.setStyle("-fx-padding: 12 0 6 0;");
+        rightSidebar.getChildren().add(sep);
+        buildPlayerOverviewSidebar();
     }
 
     private void buildDiscardSidebar(Player player, WaitingDiscardState state) {

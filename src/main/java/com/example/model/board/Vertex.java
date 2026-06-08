@@ -5,6 +5,7 @@ import com.example.model.building.VertexBuilding;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 public class Vertex {
     private final String id;
@@ -19,7 +20,7 @@ public class Vertex {
     public Vertex(double x, double y) {
         this.x = x;
         this.y = y;
-        this.id = String.format("%.1f,%.1f", x, y);
+        this.id = String.format(Locale.US,"%.1f,%.1f", x, y);
         this.building = null;
         this.port = null;
 
